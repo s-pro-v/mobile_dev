@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="pl" theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYS.ADMIN // Approval Terminal</title>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+
+<body>
+
+    <div class="sys-terminal">
+        <header>
+            <span class="sys-id">SYS.ADMIN // 2FA_APPROVAL_NODE</span>
+            <div class="controls">
+                <a href="logowanie.html" class="header-link" title="Strona logowania"><i
+                        class="fas fa-right-to-bracket"></i> Logowanie</a>
+                <a href="mobile/index.html" class="header-link" title="Panel mobilny"><i
+                        class="fas fa-mobile-screen"></i> Mobile</a>
+                <button id="refresh-btn" title="Odśwież macierz"><i class="fas fa-arrows-rotate"></i></button>
+                <button id="theme-btn" title="Zmiana motywu"><i class="fas fa-moon" id="theme-icon"></i></button>
+            </div>
+        </header>
+
+        <main class="dashboard">
+            <section class="dashboard-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-user-check" style="color: var(--success-color);"></i> Zalogowani
+                        (active_sessions)</h2>
+                    <div class="section-actions">
+                        <button type="button" id="logout-all-btn" title="Wyloguj wszystkich"><i
+                                class="fas fa-right-from-bracket"></i> Wyloguj wszystkich</button>
+                    </div>
+                </div>
+                <div class="session-list" id="sessions-container">
+                    <div class="empty-state">—</div>
+                </div>
+            </section>
+
+            <section class="dashboard-section">
+                <h2><i class="fas fa-hourglass-half" style="color: var(--warning-color);"></i> Oczekujące żądania
+                    (pending_2fa)</h2>
+                <div class="request-list" id="requests-container">
+                    <div class="empty-state">Oczekiwanie na synchronizację...</div>
+                </div>
+            </section>
+
+            <section class="dashboard-section">
+                <h2><i class="fas fa-user-shield" style="color: var(--highlight-color);"></i> Użytkownicy uprawnieni do
+                    logowania (key_f2a.json)</h2>
+                <p class="section-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    Dostęp: czy może się logować. Bez potwierdzenia: logowanie bez zatwierdzenia przez admina
+                    (shifts[3]).</p>
+                <div class="session-list" id="users-can-login-container">
+                    <div class="empty-state">Odśwież, aby wczytać listę.</div>
+                </div>
+            </section>
+
+            <section class="dashboard-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-clock-rotate-left" style="color: var(--info-color);"></i> Ostatnie zdarzenia
+                        (audit_log)</h2>
+                    <div class="section-actions">
+                        <button type="button" id="clear-audit-btn" title="Wyczyść zdarzenia"><i
+                                class="fas fa-eraser"></i> Wyczyść zdarzenia</button>
+                    </div>
+                </div>
+                <div class="audit-log" id="audit-container">
+                    <div class="empty-state">—</div>
+                </div>
+            </section>
+        </main>
+
+        <div class="status-console" id="status-log">[SYSTEM] Terminal gotowy do pracy. Inicjalizacja...</div>
+    </div>
+
+    <script>
+        /**
+         * ==========================================
+         * KONFIGURACJA GITHUB API
+         * ==========================================
+         * Wpisz swoje: właściciel repo, nazwę repo, ścieżkę pliku stanu 2FA.
+         */
+        /**
+         * Klucz API GitHub – pobierany z auth.json (XOR), fallback: localStorage.
+         * auth.json: [{ "sys_pat": "<base64-XOR-encoded>" }]
+         */
+        const AUTH_JSON_URL = 'https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/dev/auth.json';
+        const XOR_KEY = atob('dzVn');
+        let GITHUB_PAT = null;
+
+        function xorDecode(base64Encoded, key) {
+            const binary = atob(base64Encoded);
+            let out = '';
+            for (let i = 0; i < binary.length; i++) {
+                out += String.fromCharCode(binary.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            }
+            return out;
+        }
+
+        async function loadPat() {
+            try {
+                const pat = typeof localStorage !== 'undefined' && localStorage.getItem('sys_auth_github_pat');
+                if (pat && pat.trim() !== '') {
+                    GITHUB_PAT = pat.trim();
+                    return;
+                }
+            } catch (e) { /* ignore */ }
+            try {
+                const res = await fetch(AUTH_JSON_URL + '?t=' + Date.now());
+                if (!res.ok) throw new Error('auth.json ' + res.status);
+                const data = await res.json();
+                const item = Array.isArray(data) ? data[0] : data;
+                const enc = item && item.sys_pat;
+                if (!enc) throw new Error('Brak sys_pat w auth.json');
+                GITHUB_PAT = xorDecode(enc, XOR_KEY);
+            } catch (e) {
+                throw new Error('Nie można załadować klucza API: ' + (e.message || e));
+            }
+        }
+
+        function getToken() {
+            return (GITHUB_PAT && typeof GITHUB_PAT === 'string') ? GITHUB_PAT.trim() : '';
+        }
+
+        const REPO_OWNER = 's-pro-v';      // właściciel repo (user lub org)
+        const REPO_NAME = 'json-lista';     // nazwa repozytorium
+        const STATE_FILE = 'dev/sys_state.json';  // ścieżka do pliku ze stanem 2FA
+        const CREDENTIALS_FILE = 'dev/key_f2a.json';  // lista użytkowników (workers), shifts[1]===TRUE = może się zalogować
+        /** Admin – ten użytkownik ma zawsze dostęp do logowania (nie można wyłączyć). */
+        const ADMIN_LOGIN_NAME = 'Roberts';
+
+        let _lastPendingKeys = []; // Do wykrywania nowych żądań (powiadomienia)
+        let _lastSessionKeys = []; // Poprzednie klucze active_sessions – do wykrywania wylogowań
+
+        const DOM = {
+            container: document.getElementById('requests-container'),
+            sessionsContainer: document.getElementById('sessions-container'),
+            auditContainer: document.getElementById('audit-container'),
+            usersCanLoginContainer: document.getElementById('users-can-login-container'),
+            refreshBtn: document.getElementById('refresh-btn'),
+            themeBtn: document.getElementById('theme-btn'),
+            status: document.getElementById('status-log'),
+            html: document.documentElement
+        };
+
+        function updateLog(msg, state = 'default') {
+            DOM.status.textContent = msg;
+            DOM.status.className = 'status-console';
+            if (state === 'success') DOM.status.classList.add('state-success');
+            if (state === 'error') DOM.status.classList.add('state-error');
+            if (state === 'warning') DOM.status.classList.add('state-warning');
+            if (state === 'info') DOM.status.classList.add('state-info');
+        }
+
+        /** Powiadomienia przeglądarki (potwierdzenie / nowe żądania) */
+        async function ensureNotificationPermission() {
+            if (!('Notification' in window)) return false;
+            if (Notification.permission === 'granted') return true;
+            if (Notification.permission !== 'denied') {
+                const p = await Notification.requestPermission();
+                return p === 'granted';
+            }
+            return false;
+        }
+        function notifyAdmin(title, body) {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            try {
+                new Notification(title, { body, icon: '/favicon.ico' });
+            } catch (e) { /* ignore */ }
+        }
+
+        // --- GITHUB HELPERS ---
+        const toBase64 = str => btoa(unescape(encodeURIComponent(str)));
+        const fromBase64 = b64 => decodeURIComponent(escape(atob(b64)));
+
+        async function githubGetFile(path) {
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?t=${Date.now()}`;
+
+            let res;
+            try {
+                res = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+            } catch (networkError) {
+                throw new Error(`Połączenie odrzucone (Failed to fetch). Sprawdź GITHUB_PAT.`);
+            }
+
+            if (res.status === 404) return { sha: null, data: { active_sessions: {}, audit_log: [], pending_2fa: {}, access_permissions: {} } };
+            if (res.status === 401) throw new Error(`Odmowa dostępu (401). Twój klucz API jest nieważny lub wygasł.`);
+            if (!res.ok) throw new Error(`API GET Error: ${res.status}`);
+
+            const fileData = await res.json();
+            const content = fromBase64(fileData.content).trim();
+
+            let parsedData = { active_sessions: {}, audit_log: [], pending_2fa: {}, access_permissions: {} };
+            if (content) {
+                try { parsedData = JSON.parse(content); } catch (e) { }
+            }
+
+            parsedData.pending_2fa = parsedData.pending_2fa || {};
+            parsedData.access_permissions = parsedData.access_permissions || {};
+            parsedData.audit_log = parsedData.audit_log || [];
+
+            return { sha: fileData.sha, data: parsedData };
+        }
+
+        async function githubPutFile(path, dataObj, sha, commitMsg) {
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`;
+            const body = { message: commitMsg, content: toBase64(JSON.stringify(dataObj, null, 2)) };
+            if (sha) body.sha = sha;
+
+            let res;
+            try {
+                res = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+            } catch (networkError) {
+                throw new Error(`Połączenie odrzucone (Failed to fetch). Zapis zablokowany.`);
+            }
+
+            if (res.status === 401) throw new Error(`Odmowa dostępu (401). Klucz API nie ma uprawnień do zapisu (wymagany zakres 'repo').`);
+            if (!res.ok) throw new Error(`API PUT Error: ${res.status}`);
+            return await res.json();
+        }
+
+        /** Pobiera dowolny plik JSON z repo (bez domyślnej struktury stanu). */
+        async function githubGetFileRaw(path) {
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?t=${Date.now()}`;
+            let res;
+            try {
+                res = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+            } catch (e) {
+                throw new Error('Połączenie odrzucone (Failed to fetch).');
+            }
+            if (res.status === 404) return { sha: null, data: { workers: [] } };
+            if (!res.ok) throw new Error(`API GET Error: ${res.status}`);
+            const fileData = await res.json();
+            const content = fromBase64(fileData.content).trim();
+            let data = { workers: [] };
+            if (content) {
+                try { data = JSON.parse(content); } catch (e) { }
+            }
+            return { sha: fileData.sha, data: data };
+        }
+
+        /**
+         * Skanowanie macierzy sys_state
+         */
+        async function fetchRequests() {
+            DOM.refreshBtn.disabled = true;
+
+            if (!REPO_OWNER || !REPO_NAME || !STATE_FILE) {
+                updateLog('[KONFIGURACJA] Uzupełnij REPO_OWNER, REPO_NAME i STATE_FILE (swoje repo i ścieżkę pliku JSON).', 'warning');
+                DOM.refreshBtn.disabled = false;
+                return;
+            }
+
+            if (!getToken() && !window._tokenWarningShown) {
+                updateLog('[SYSTEM] Brak tokenu – ustaw GITHUB_PAT lub localStorage (sys_auth_github_pat) dla odczytu i zapisu.', 'warning');
+                window._tokenWarningShown = true;
+            }
+
+            try {
+                const { data } = await githubGetFile(STATE_FILE);
+                const keys = Object.keys(data.pending_2fa || {});
+                const newKeys = keys.filter(k => !_lastPendingKeys.includes(k));
+                _lastPendingKeys = keys;
+
+                const sessions = data.active_sessions || {};
+                const currentSessionKeys = Object.keys(sessions);
+                const loggedOutKeys = _lastSessionKeys.filter(k => !currentSessionKeys.includes(k));
+                _lastSessionKeys = currentSessionKeys;
+
+                if (loggedOutKeys.length > 0) {
+                    const names = loggedOutKeys.map(k => k.toUpperCase()).join(', ');
+                    updateLog('[INFO] Wylogowano: ' + names + ' – zaktualizowano active_sessions.', 'info');
+                    if (DOM.status && DOM.status.scrollIntoView) DOM.status.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    await ensureNotificationPermission();
+                    notifyAdmin('SYS.ADMIN – wylogowanie', names + ' wylogował/a się. Lista sesji zaktualizowana.');
+                }
+
+                renderRequests(data.pending_2fa);
+                renderActiveSessions(sessions);
+                renderAuditLog(data.audit_log || []);
+                fetchAndRenderUsersCanLogin();
+
+                if (newKeys.length > 0) {
+                    await ensureNotificationPermission();
+                    const names = newKeys.map(k => k.toUpperCase()).join(', ');
+                    notifyAdmin('SYS.ADMIN – nowe żądanie 2FA', `Oczekują: ${names}`);
+                }
+            } catch (err) {
+                updateLog(`[BŁĄD] Awaria pobierania strumienia: ${err.message}`, 'error');
+            } finally {
+                DOM.refreshBtn.disabled = false;
+            }
+        }
+
+        function renderActiveSessions(sessions) {
+            DOM.sessionsContainer.innerHTML = '';
+            const keys = Object.keys(sessions);
+            if (keys.length === 0) {
+                DOM.sessionsContainer.innerHTML = '<div class="empty-state">Brak aktywnych sesji.</div>';
+                return;
+            }
+            keys.forEach(key => {
+                const s = sessions[key];
+                const name = (s && s.original_name) ? s.original_name : key;
+                const lastActive = (s && s.last_active) ? new Date(s.last_active).toLocaleString('pl-PL') : '—';
+                const el = document.createElement('div');
+                el.className = 'session-item';
+                el.innerHTML = `
+                    <span class="name">${String(name).toUpperCase()}</span>
+                    <div class="session-item-actions">
+                        <span class="time">ostatnia aktywność: ${lastActive}</span>
+                        <button type="button" class="btn-logout" title="Wyloguj" onclick="processLogout('${key.replace(/'/g, "\\'")}')"><i class="fas fa-right-from-bracket"></i></button>
+                    </div>`;
+                DOM.sessionsContainer.appendChild(el);
+            });
+        }
+
+        function renderAuditLog(log) {
+            DOM.auditContainer.innerHTML = '';
+            const lines = Array.isArray(log) ? log.slice(0, 20) : [];
+            if (lines.length === 0) {
+                DOM.auditContainer.innerHTML = '<div class="empty-state">Brak wpisów.</div>';
+                return;
+            }
+            lines.forEach(line => {
+                const el = document.createElement('div');
+                const s = String(line).toUpperCase();
+                let cls = 'audit-line';
+                if (s.includes('ZATWIERDZONO') || s.includes('AUTH_SUCCESS') || s.includes('TUNEL')) cls += ' audit-success';
+                else if (s.includes('ODRZUCONO') || s.includes('ODMOWA')) cls += ' audit-error';
+                else if (s.includes('WYLOGOWANO') || s.includes('PRZERWANIE') || s.includes('USER_LOGOUT') || s.includes('WYLOGOWAŁ')) cls += ' audit-warning';
+                else if (s.includes('ADMIN_ACTION') || s.includes('ŻĄDANIE')) cls += ' audit-info';
+                el.className = cls;
+                el.textContent = line;
+                DOM.auditContainer.appendChild(el);
+            });
+        }
+
+        /** Lista użytkowników uprawnionych do logowania (z key_f2a.json). */
+        let _credentialsCache = { sha: null, data: null };
+        async function fetchAndRenderUsersCanLogin() {
+            if (!DOM.usersCanLoginContainer) return;
+            try {
+                const { sha, data } = await githubGetFileRaw(CREDENTIALS_FILE);
+                _credentialsCache = { sha, data: data || {} };
+                renderUsersCanLogin(data.workers || [], sha);
+            } catch (e) {
+                DOM.usersCanLoginContainer.innerHTML = '<div class="empty-state">Brak dostępu do listy (sprawdź token i ścieżkę ' + CREDENTIALS_FILE + ').</div>';
+            }
+        }
+        function isAdminLoginName(name) {
+            if (!name || typeof name !== 'string') return false;
+            const n = name.trim().toLowerCase();
+            const admin = (ADMIN_LOGIN_NAME || '').trim().toLowerCase();
+            return admin && n === admin;
+        }
+        function renderUsersCanLogin(workers, fileSha) {
+            DOM.usersCanLoginContainer.innerHTML = '';
+            if (!workers.length) {
+                DOM.usersCanLoginContainer.innerHTML = '<div class="empty-state">Brak użytkowników w pliku.</div>';
+                return;
+            }
+            workers.forEach((w, index) => {
+                const name = (w && w.name) ? String(w.name) : ('Węzeł ' + (index + 1));
+                const shifts = Array.isArray(w.shifts) ? w.shifts : [];
+                const isAdmin = isAdminLoginName(name);
+                const canLogin = isAdmin || shifts[1] === 'TRUE' || shifts[1] === true;
+                const skip2fa = shifts[3] === 'TRUE' || shifts[3] === true;
+                const row = document.createElement('div');
+                row.className = 'session-item user-login-row';
+                const badgeLabel = canLogin ? (isAdmin ? 'TRUE (admin)' : 'TRUE') : 'FALSE';
+                const noToggle = isAdmin;
+                const skip2faLabel = skip2fa ? 'TRUE' : 'FALSE';
+                row.innerHTML = `
+                    <span class="name">${escapeHtml(name)}</span>
+                    <span class="user-login-badge ${canLogin ? 'badge-true' : 'badge-false'}">${escapeHtml(badgeLabel)}</span>
+                    ${noToggle ? '<span class="user-login-hint">(admin)</span>' : `<button type="button" class="btn-toggle-login" data-index="${index}" title="Przełącz dostęp">${canLogin ? 'Wyłącz' : 'Włącz'}</button>`}
+                    <span class="user-login-badge ${skip2fa ? 'badge-skip2fa' : 'badge-false'}">${escapeHtml(skip2faLabel)}</span>
+                    <span class="user-login-hint" style="min-width: 6rem;">Bez potwierdzenia</span>
+                    ${noToggle ? '<span class="user-login-hint">—</span>' : `<button type="button" class="btn-toggle-skip2fa" data-index="${index}" title="Przełącz logowanie bez potwierdzenia">${skip2fa ? 'Wyłącz' : 'Włącz'}</button>`}
+                `;
+                const btn = row.querySelector('.btn-toggle-login');
+                if (btn) btn.addEventListener('click', () => processToggleUserLogin(index, fileSha));
+                const btnSkip = row.querySelector('.btn-toggle-skip2fa');
+                if (btnSkip) btnSkip.addEventListener('click', () => processToggleSkip2fa(index));
+                DOM.usersCanLoginContainer.appendChild(row);
+            });
+        }
+        function escapeHtml(str) {
+            if (str == null) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+        async function processToggleUserLogin(workerIndex, fileSha) {
+            if (!getToken()) {
+                updateLog('[KRYTYCZNE] Ustaw token (GITHUB_PAT lub localStorage).', 'error');
+                return;
+            }
+            const data = _credentialsCache.data;
+            const workers = data && Array.isArray(data.workers) ? data.workers : [];
+            const w = workers[workerIndex];
+            if (!w || !Array.isArray(w.shifts)) {
+                updateLog('[BŁĄD] Nieprawidłowa struktura workers.', 'error');
+                return;
+            }
+            if (isAdminLoginName(w.name)) {
+                updateLog('[INFO] Admin ma zawsze dostęp – nie można wyłączyć.', 'warning');
+                return;
+            }
+            while (w.shifts.length <= 1) w.shifts.push('');
+            const newVal = w.shifts[1] === 'TRUE' || w.shifts[1] === true ? 'FALSE' : 'TRUE';
+            w.shifts[1] = newVal;
+            updateLog('[SYSTEM] Zapis uprawnień dla ' + (w.name || '') + ' -> ' + newVal + '...', 'warning');
+            try {
+                await githubPutFile(CREDENTIALS_FILE, data, _credentialsCache.sha, '[SYS.ADMIN] Zmiana uprawnień logowania: ' + (w.name || ''));
+                updateLog('[SUKCES] Uprawnienia zaktualizowane.', 'success');
+                fetchAndRenderUsersCanLogin();
+            } catch (err) {
+                updateLog('[BŁĄD] ' + err.message, 'error');
+            }
+        }
+        async function processToggleSkip2fa(workerIndex) {
+            if (!getToken()) {
+                updateLog('[KRYTYCZNE] Ustaw token (GITHUB_PAT lub localStorage).', 'error');
+                return;
+            }
+            const data = _credentialsCache.data;
+            const workers = data && Array.isArray(data.workers) ? data.workers : [];
+            const w = workers[workerIndex];
+            if (!w || !Array.isArray(w.shifts)) {
+                updateLog('[BŁĄD] Nieprawidłowa struktura workers.', 'error');
+                return;
+            }
+            if (isAdminLoginName(w.name)) {
+                updateLog('[INFO] Admin – edycja w pliku ręcznie.', 'warning');
+                return;
+            }
+            while (w.shifts.length <= 3) w.shifts.push('');
+            const newVal = (w.shifts[3] === 'TRUE' || w.shifts[3] === true) ? 'FALSE' : 'TRUE';
+            w.shifts[3] = newVal;
+            updateLog('[SYSTEM] Bez potwierdzenia dla ' + (w.name || '') + ' -> ' + newVal + '...', 'warning');
+            try {
+                await githubPutFile(CREDENTIALS_FILE, data, _credentialsCache.sha, '[SYS.ADMIN] Bez potwierdzenia: ' + (w.name || ''));
+                updateLog('[SUKCES] Zaktualizowano.', 'success');
+                fetchAndRenderUsersCanLogin();
+            } catch (err) {
+                updateLog('[BŁĄD] ' + err.message, 'error');
+            }
+        }
+
+        function renderRequests(pendingObj) {
+            DOM.container.innerHTML = '';
+            const keys = Object.keys(pendingObj);
+
+            if (keys.length === 0) {
+                DOM.container.innerHTML = '<div class="empty-state">Brak węzłów oczekujących na autoryzację.</div>';
+                return;
+            }
+
+            keys.forEach(userKey => {
+                const req = pendingObj[userKey] || {};
+                const token = (req.token != null && req.token !== '') ? String(req.token).replace(/\D/g, '').slice(0, 6) : '—';
+                const device = req.deviceShort || req.device || '—';
+                const esc = (s) => { if (s == null) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+                const card = document.createElement('div');
+                card.className = 'request-card';
+                card.innerHTML = `
+                    <div class="req-info">
+                        <div class="req-user">Węzeł: ${esc(userKey.toUpperCase())}</div>
+                        <div class="req-token" title="Kod 6-cyfrowy (shifts)">Kod: <strong>${esc(token)}</strong></div>
+                        <div class="req-device" title="Urządzenie – do weryfikacji">Urządzenie: <span class="req-device-text">${esc(device)}</span></div>
+                    </div>
+                    <div class="req-actions">
+                        <button class="btn-approve" onclick="processDecision('${userKey.replace(/'/g, "\\'")}', 'GRANTED')"><i class="fas fa-check"></i> Zatwierdź</button>
+                        <button class="btn-deny" onclick="processDecision('${userKey.replace(/'/g, "\\'")}', 'DENIED')"><i class="fas fa-xmark"></i> Odrzuć</button>
+                    </div>
+                `;
+                DOM.container.appendChild(card);
+            });
+        }
+
+        /**
+         * Zapis decyji do API (Commit)
+         */
+        window.processDecision = async function (userKey, decision) {
+            if (!getToken()) {
+                updateLog('[KRYTYCZNE] Ustaw token: w konsoli wpisz localStorage.setItem("sys_auth_github_pat", "ghp_TWOJ_TOKEN") i odśwież stronę.', 'error');
+                return;
+            }
+
+            updateLog(`[SYSTEM] Zapisywanie flagi [${decision}] dla węzła ${userKey.toUpperCase()}...`, 'warning');
+
+            const buttons = document.querySelectorAll('.req-actions button');
+            buttons.forEach(btn => btn.disabled = true);
+
+            try {
+                const { data, sha } = await githubGetFile(STATE_FILE);
+
+                if (data.pending_2fa[userKey]) delete data.pending_2fa[userKey];
+                data.access_permissions[userKey] = decision;
+
+                const timestamp = new Date().toLocaleString('pl-PL');
+                const actionText = decision === 'GRANTED' ? 'ZATWIERDZONO' : 'ODRZUCONO';
+                data.audit_log.unshift(`[${timestamp}] ADMIN_ACTION: ${actionText} dostęp dla -> ${userKey.toUpperCase()}`);
+                if (data.audit_log.length > 100) data.audit_log.pop();
+
+                await githubPutFile(STATE_FILE, data, sha, `[SYS.ADMIN] Decyzja 2FA: ${decision} dla ${userKey}`);
+
+                updateLog(`[SUKCES] Flaga ${decision} zaaplikowana. Zmiany wysłane do Github.`, 'success');
+                await ensureNotificationPermission();
+                const action = decision === 'GRANTED' ? 'Zatwierdzono' : 'Odrzucono';
+                notifyAdmin('Potwierdzenie 2FA', `${action} dostęp dla ${userKey.toUpperCase()}`);
+                renderRequests(data.pending_2fa);
+
+            } catch (err) {
+                updateLog(`[BŁĄD KRYTYCZNY] Błąd modyfikacji stanu: ${err.message}`, 'error');
+            } finally {
+                const buttons = document.querySelectorAll('.req-actions button');
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        };
+
+        /** Wylogowanie pojedynczego węzła */
+        window.processLogout = async function (userKey) {
+            if (!getToken()) {
+                updateLog('[KRYTYCZNE] Ustaw token (GITHUB_PAT lub localStorage).', 'error');
+                return;
+            }
+            updateLog(`[SYSTEM] Wylogowanie węzła ${userKey.toUpperCase()}...`, 'warning');
+            try {
+                const { data, sha } = await githubGetFile(STATE_FILE);
+                if (data.active_sessions[userKey]) delete data.active_sessions[userKey];
+                const ts = new Date().toLocaleString('pl-PL');
+                data.audit_log.unshift(`[${ts}] ADMIN_ACTION: Wylogowano węzeł -> ${userKey.toUpperCase()}`);
+                if (data.audit_log.length > 100) data.audit_log.pop();
+                await githubPutFile(STATE_FILE, data, sha, `[SYS.ADMIN] Wylogowano ${userKey}`);
+                updateLog(`[SUKCES] Węzeł ${userKey.toUpperCase()} wylogowany.`, 'success');
+                renderActiveSessions(data.active_sessions || {});
+                renderAuditLog(data.audit_log || []);
+            } catch (err) {
+                updateLog(`[BŁĄD] ${err.message}`, 'error');
+            }
+        };
+
+        /** Wylogowanie wszystkich */
+        async function processLogoutAll() {
+            if (!getToken()) {
+                updateLog('[KRYTYCZNE] Ustaw token (GITHUB_PAT lub localStorage).', 'error');
+                return;
+            }
+            updateLog('[SYSTEM] Wylogowanie wszystkich węzłów...', 'warning');
+            try {
+                const { data, sha } = await githubGetFile(STATE_FILE);
+                const count = Object.keys(data.active_sessions || {}).length;
+                data.active_sessions = {};
+                const ts = new Date().toLocaleString('pl-PL');
+                data.audit_log.unshift(`[${ts}] ADMIN_ACTION: Wylogowano wszystkich (${count})`);
+                if (data.audit_log.length > 100) data.audit_log.pop();
+                await githubPutFile(STATE_FILE, data, sha, '[SYS.ADMIN] Wylogowano wszystkich');
+                updateLog(`[SUKCES] Wylogowano ${count} węzłów.`, 'success');
+                renderActiveSessions({});
+                renderAuditLog(data.audit_log || []);
+            } catch (err) {
+                updateLog(`[BŁĄD] ${err.message}`, 'error');
+            }
+        }
+
+        /** Czyszczenie zdarzeń (audit_log) */
+        async function processClearAudit() {
+            if (!getToken()) {
+                updateLog('[KRYTYCZNE] Ustaw token (GITHUB_PAT lub localStorage).', 'error');
+                return;
+            }
+            updateLog('[SYSTEM] Czyszczenie zdarzeń (audit_log)...', 'warning');
+            try {
+                const { data, sha } = await githubGetFile(STATE_FILE);
+                data.audit_log = [];
+                await githubPutFile(STATE_FILE, data, sha, '[SYS.ADMIN] Wyczyszczono audit_log');
+                updateLog('[SUKCES] Zdarzenia wyczyszczone.', 'success');
+                renderAuditLog([]);
+            } catch (err) {
+                updateLog(`[BŁĄD] ${err.message}`, 'error');
+            }
+        }
+
+        // --- BINDING UI ---
+        DOM.refreshBtn.addEventListener('click', () => {
+            fetchRequests();
+        });
+        document.getElementById('logout-all-btn').addEventListener('click', processLogoutAll);
+        document.getElementById('clear-audit-btn').addEventListener('click', processClearAudit);
+
+        const THEME_KEY = 'sys_admin_theme';
+        function applyTheme(theme) {
+            const value = theme === 'light' ? 'light' : 'dark';
+            DOM.html.setAttribute('theme', value);
+            const icon = document.getElementById('theme-icon');
+            if (icon) icon.className = value === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+            DOM.themeBtn.title = value === 'dark' ? 'Tryb jasny' : 'Tryb ciemny';
+            try { localStorage.setItem(THEME_KEY, value); } catch (e) { }
+        }
+        DOM.themeBtn.addEventListener('click', () => {
+            const isDark = DOM.html.getAttribute('theme') === 'dark';
+            applyTheme(isDark ? 'light' : 'dark');
+        });
+        (function initTheme() {
+            try {
+                const saved = localStorage.getItem(THEME_KEY);
+                if (saved === 'light' || saved === 'dark') applyTheme(saved);
+                else applyTheme(DOM.html.getAttribute('theme') || 'dark');
+            } catch (e) {
+                applyTheme('dark');
+            }
+        })();
+
+        // Autostart: załaduj klucz API (auth.json XOR lub localStorage), potem powiadomienia i odświeżanie co 10 s
+        loadPat().then(function () {
+            ensureNotificationPermission();
+            fetchRequests();
+            setInterval(fetchRequests, 10000);
+        }).catch(function (e) {
+            updateLog('[BŁĄD] ' + (e.message || e), 'error');
+        });
+
+        // Brak możliwości cofania (przycisk Wstecz)
+        (function () {
+            if (typeof history === 'undefined' || !history.pushState) return;
+            history.pushState(null, '', location.href);
+            window.addEventListener('popstate', function () { history.pushState(null, '', location.href); });
+        })();
+    </script>
+</body>
+
+</html>

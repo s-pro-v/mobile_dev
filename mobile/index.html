@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pl" theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TERMINAL OBSADY v3.1</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg viewBox='0 0 1024 1024' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M736.68 435.86a173.773 173.773 0 0 1 172.042 172.038c0.578 44.907-18.093 87.822-48.461 119.698-32.761 34.387-76.991 51.744-123.581 52.343-68.202 0.876-68.284 106.718 0 105.841 152.654-1.964 275.918-125.229 277.883-277.883 1.964-152.664-128.188-275.956-277.883-277.879-68.284-0.878-68.202 104.965 0 105.842zM285.262 779.307A173.773 173.773 0 0 1 113.22 607.266c-0.577-44.909 18.09-87.823 48.461-119.705 32.759-34.386 76.988-51.737 123.58-52.337 68.2-0.877 68.284-106.721 0-105.842C132.605 331.344 9.341 454.607 7.379 607.266 5.417 759.929 135.565 883.225 285.262 885.148c68.284 0.876 68.2-104.965 0-105.841z' fill='%23292929'/%3E%3Cpath d='M339.68 384.204a173.762 173.762 0 0 1 172.037-172.038c44.908-0.577 87.822 18.092 119.698 48.462 34.388 32.759 51.743 76.985 52.343 123.576 0.877 68.199 106.72 68.284 105.843 0-1.964-152.653-125.231-275.917-277.884-277.879-152.664-1.962-275.954 128.182-277.878 277.879-0.88 68.284 104.964 68.199 105.841 0z' fill='%23f39a2b'/%3E%3Cpath d='M545.039 473.078c16.542 16.542 16.542 43.356 0 59.896l-122.89 122.895c-16.542 16.538-43.357 16.538-59.896 0-16.542-16.546-16.542-43.362 0-59.899l122.892-122.892c16.537-16.542 43.355-16.542 59.894 0z' fill='%23949494'/%3E%3Cpath d='M485.17 473.078c16.537-16.539 43.354-16.539 59.892 0l122.896 122.896c16.538 16.533 16.538 43.354 0 59.896-16.541 16.538-43.361 16.538-59.898 0L485.17 532.979c-16.547-16.543-16.547-43.359 0-59.901z' fill='%23949494'/%3E%3Cpath d='M514.045 634.097c23.972 0 43.402 19.433 43.402 43.399v178.086c0 23.968-19.432 43.398-43.402 43.398-23.964 0-43.396-19.432-43.396-43.398V677.496c0.001-23.968 19.433-43.399 43.396-43.399z' fill='%23dbdbdb'/%3E%3C/svg%3E">
+    <!-- Lucide: ikony przez skrypt (createIcons()), bez osobnego CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css"
+        href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/regular/style.css">
+    <script src="https://unpkg.com/lucide@0.552.0/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="../css/mobile.css">
+</head>
+
+
+<body id="app-body">
+
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <span id="active-key-display-header" class="active-key-display" title="Użyty klucz dostępu"></span>
+            <div class="header-top">
+                <h1 class="header-title uppercase">
+                    <img src="https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/cpu.png" alt="cpu"
+                        class="header-logo">
+                    OBSADA ZMIANY v3.1
+                </h1>
+                <a href="../admin.html" id="link-admin-panel" class="nav-btn log hidden" title="Panel administratora"
+                    style="text-decoration: none; color: inherit;"><i class="fas fa-user-shield"></i></a>
+                <button type="button" class="nav-btn log" id="btn-logout" data-action="open-logout-modal"
+                    title="Wyjdź (panel dostępu)">
+                    <i data-lucide="door-open"></i>
+                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleTheme()" class="theme-btn" id="theme-btn" title="Zmień motyw">
+                        <img src="https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png"
+                            alt="theme" id="theme-icon" class="view-icon">
+                    </button>
+                </div>
+            </div>
+            <!-- View Switcher -->
+            <div id="view-switcher-tabs" class="view-switcher">
+                <button id="btn-view-daily" class="view-btn active" onclick="switchView('daily')">
+                    <img src="https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/cloud.png"
+                        alt="cloud" class="view-icon">
+                    Grafik
+                </button>
+                <button onclick="goToToday()" class="reset-day-btn" title="Reset Day">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </button>
+                <button id="btn-view-individual" class="view-btn" onclick="switchView('individual')">
+                    <img src="https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/file.png" alt="file"
+                        class="view-icon">
+                    Szczegóły
+                </button>
+            </div>
+
+            <!-- Back Button (Individual View) -->
+            <div id="view-switcher-back" class="view-switcher hidden">
+                <button class="view-btn-back" onclick="switchView('daily')">
+                    <i class="fas fa-arrow-left"></i>
+                    Wróć do Grafiku
+                </button>
+            </div>
+
+            <!-- Date Controls (Daily View) -->
+            <div id="controls-daily" class="date-controls">
+                <button onclick="changeDay(-1)" class="nav-btn">
+                    <i data-lucide="chevron-left"></i>
+                </button>
+
+                <div id="date-display-wrap" class="date-display-wrap text-center flex-grow" role="button" tabindex="0"
+                    aria-label="Wybierz miesiąc" title="Kliknij – lista miesięcy">
+                    <div id="current-day-name" class="date-display-label">--</div>
+                    <div id="current-date-display" class="date-display-value">--</div>
+                    <div id="months-dropdown" class="months-dropdown hidden" aria-hidden="true">
+                        <div class="months-dropdown-title">Miesiące</div>
+                        <div id="months-dropdown-list" class="months-dropdown-list"></div>
+                    </div>
+                </div>
+                <button onclick="changeDay(1)" class="nav-btn">
+                    <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
+
+            <!-- Worker Controls (Individual View) -->
+            <div id="controls-individual" class="worker-controls hidden">
+                <!-- Przełącznik miesiąca w widoku osobistym -->
+                <div id="individual-month-wrap" class="individual-month-wrap" style="display: none;">
+                    <button type="button" class="nav-btn" id="individual-month-prev" title="Poprzedni miesiąc"
+                        aria-label="Poprzedni miesiąc">
+                        <i data-lucide="chevron-left"></i>
+                    </button>
+                    <div id="individual-month-display" class="individual-month-display" title="Aktualny miesiąc">--
+                    </div>
+                    <button type="button" class="nav-btn" id="individual-month-next" title="Następny miesiąc"
+                        aria-label="Następny miesiąc">
+                        <i data-lucide="chevron-right"></i>
+                    </button>
+                </div>
+                <div class="custom-select-wrapper">
+                    <div id="worker-select-display" class="custom-select-display">
+                        WYBIERZ...
+                    </div>
+                    <div id="worker-select-dropdown" class="custom-select-dropdown hidden">
+                        <!-- Options will be populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="main-container">
+        <div class="content-wrapper">
+            <!-- Loader -->
+            <div id="loader">
+                <div class="loader-inner">
+                    <div class="loader-spinner-wrap">
+                        <i data-lucide="loader-2" class="spinner"></i>
+                    </div>
+                    <p class="loader-text">INICJALIZACJA SYSTEMU...</p>
+                </div>
+            </div>
+
+            <!-- DAILY VIEW CONTAINER -->
+            <div id="view-daily" class="hidden">
+
+                <!-- SEKJA 1 ZMIANA -->
+                <section class="style-shift-1">
+                    <div class="section-header">
+                        <div class="dot"></div>
+                        <h2 class="section-title">I Zmiana</h2>
+
+                        <span id="count-1" class="counter-badge">0</span>
+                    </div>
+
+                    <!-- Lista 1 -->
+                    <div id="list-1" class="list-grid"></div>
+
+                    <!-- Podsekcja P1 -->
+                    <div id="container-p1" class="mt-4 hidden">
+                        <hr class="sub-section-divider">
+                        <div class="sub-section-header sub-section-p1">
+                            <i data-lucide="users" size="14"></i> Obsada <span class="sub-section-p1-text">P1</span>
+                        </div>
+                        <div id="list-p1" class="sub-list"></div>
+                    </div>
+                </section>
+
+                <!-- SEKCJA 2 ZMIANA -->
+                <section class="mt-4 style-shift-2 section-divider">
+                    <div class="section-header">
+                        <div class="dot"></div>
+                        <h2 class="section-title">II Zmiana</h2>
+                        <span id="count-2" class="counter-badge">0</span>
+                    </div>
+
+                    <!-- Lista 2 -->
+                    <div id="list-2" class="list-grid"></div>
+
+                    <!-- Podsekcja P2 -->
+                    <div id="container-p2" class="mt-4 hidden">
+                        <hr class="sub-section-divider">
+                        <div class="sub-section-header sub-section-p2">
+                            <i data-lucide="users" size="14"></i> Obsada <span class="sub-section-p2-text">P2</span>
+                        </div>
+                        <div id="list-p2" class="sub-list"></div>
+                    </div>
+                </section>
+
+                <!-- Inne -->
+                <section id="section-other" class="mt-4 style-shift-other section-divider">
+                    <div class="section-header">
+                        <div class="dot"></div>
+                        <h2 class="section-title">Inne</h2>
+                        <span id="count-other" class="counter-badge">0</span>
+                    </div>
+                    <div id="list-other" class="list-grid"></div>
+                </section>
+
+                <!-- Urlopy/Wolne -->
+                <section class="mt-4 section-divider">
+                    <div class="section-header">
+                        <div class="dot" style="background-color: var(--danger-color);"></div>
+                        <h2 class="section-title" style="color: var(--danger-color);">Nieobecni / Wolne</h2>
+                        <span id="count-absent" class="counter-badge">0</span>
+                    </div>
+                    <button onclick="toggleAbsent()" class="toggle-btn">
+                        <i data-lucide="eye" size="14"></i> <span id="toggle-text">Pokaż</span>
+                    </button>
+                    <div id="list-absent" class="absent-list hidden"
+                        style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem;     min-height: 67vh;"></div>
+                </section>
+
+            </div>
+
+            <!-- INDIVIDUAL VIEW CONTAINER (Now Calendar Grid) -->
+            <div id="view-individual" class="hidden">
+                <div id="individual-list" class="list-grid">
+                    <div class="footer-info"
+                        style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.8rem; margin-top: 2rem; opacity: 0.7;">
+                        Wybierz z listy powyżej.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal listy pracowników (widok Szczegóły) -->
+    <div id="worker-select-overlay" class="worker-select-overlay hidden" aria-hidden="true"></div>
+
+    <!-- Modal potwierdzenia wylogowania -->
+    <div id="logout-confirm-overlay" class="confirm-modal-overlay hidden" aria-hidden="true">
+        <div class="confirm-modal" role="dialog" aria-labelledby="logout-confirm-title" aria-modal="true">
+            <div class="confirm-modal-header">
+                <i data-lucide="log-out" class="confirm-modal-icon"></i>
+                <h2 id="logout-confirm-title" class="confirm-modal-title">Wylogowanie</h2>
+            </div>
+            <p class="confirm-modal-text">Czy na pewno chcesz się wylogować?</p>
+            <div class="confirm-modal-actions">
+                <button type="button" class="confirm-modal-btn confirm-modal-btn-cancel"
+                    id="logout-confirm-cancel">Anuluj</button>
+                <button type="button" class="confirm-modal-btn confirm-modal-btn-confirm"
+                    id="logout-confirm-ok">Wyloguj</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+
+</html>

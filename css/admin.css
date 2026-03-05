@@ -1,0 +1,484 @@
+@import "shared.css";
+
+/*
+ * RESET & GLOBAL DIRECTIVES — admin
+ */
+* {
+    box-sizing: border-box;
+    border-radius: 0 !important;
+    font-family: 'JetBrains Mono', 'Share Tech Mono', Monaco, Courier, monospace;
+    user-select: none;
+    scrollbar-width: none;
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    transition: background-color 0.3s, color 0.3s;
+    background-image: var(--bg-grid);
+    background-size: var(--bg-grid-size);
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: var(--background-image);
+    z-index: -1;
+}
+
+.sys-terminal {
+    width: 100%;
+    max-width: 800px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 2rem;
+    box-shadow: var(--shadow-drop);
+    background-image: var(--bg-stripe-pattern);
+    background-size: var(--bg-stripe-size);
+}
+
+.sys-terminal header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 0.2rem;
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal header .sys-id {
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    padding: 0.2rem 0.5rem;
+}
+
+.sys-terminal header .controls {
+    display: flex;
+    gap: 0.2rem;
+}
+
+.sys-terminal header .controls button {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-drop);
+}
+
+.sys-terminal header .controls button .fas {
+    margin-right: 0;
+}
+
+.sys-terminal header .controls button:hover {
+    background: var(--hover-bg);
+    color: var(--text-color);
+}
+
+.sys-terminal header .controls button:active {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal header .controls .header-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-drop);
+}
+
+.sys-terminal header .controls .header-link:hover {
+    background: var(--hover-bg);
+    color: var(--text-color);
+}
+
+.sys-terminal .dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.sys-terminal .dashboard .dashboard-section {
+    margin-bottom: 1rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem;
+    box-shadow: var(--shadow-drop);
+}
+
+.sys-terminal .dashboard .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.sys-terminal .dashboard .section-header h2 {
+    margin-bottom: 0;
+}
+
+.sys-terminal .dashboard h2 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    margin: 0 0 0.75rem 0;
+    padding: 0.5rem 1rem;
+    color: var(--text-muted);
+    background-color: var(--bg);
+    border: 1px solid var(--border-color);
+    border-bottom: 1px dashed var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sys-terminal .dashboard h2 .fas {
+    margin-right: 0.5rem;
+}
+
+.sys-terminal .dashboard .session-list,
+.sys-terminal .dashboard .audit-log {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    font-size: 0.85rem;
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal .dashboard .session-item {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow-drop);
+}
+
+.sys-terminal .dashboard .session-item .name {
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.sys-terminal .dashboard .session-item .time {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.sys-terminal .dashboard .session-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sys-terminal .dashboard .btn-logout {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    background: var(--bg-tertiary);
+    color: var(--danger-color);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: var(--shadow-drop);
+    transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.sys-terminal .dashboard .btn-logout:hover {
+    background: var(--hover-bg);
+    color: var(--text-color);
+}
+
+.sys-terminal .dashboard .btn-logout:active {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal .dashboard .section-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.sys-terminal .dashboard .section-actions button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: var(--shadow-drop);
+    transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.sys-terminal .dashboard .section-actions button .fas {
+    margin-right: 0.35rem;
+    color: var(--danger-color);
+}
+
+.sys-terminal .dashboard .section-actions button:hover {
+    background: var(--hover-bg);
+    color: var(--text-color);
+}
+
+.sys-terminal .dashboard .section-actions button:active {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal .dashboard .audit-log .audit-line {
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    border-left: 3px solid var(--text-muted);
+    color: var(--text-muted);
+    word-break: break-word;
+}
+
+.sys-terminal .dashboard .audit-log .audit-line.audit-success {
+    color: var(--success-color);
+    border-left-color: var(--success-color);
+}
+
+.sys-terminal .dashboard .audit-log .audit-line.audit-error {
+    color: var(--danger-color);
+    border-left-color: var(--danger-color);
+}
+
+.sys-terminal .dashboard .audit-log .audit-line.audit-warning {
+    color: var(--warning-color);
+    border-left-color: var(--warning-color);
+}
+
+.sys-terminal .dashboard .audit-log .audit-line.audit-info {
+    color: var(--info-color);
+    border-left-color: var(--info-color);
+}
+
+.sys-terminal .dashboard .request-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.sys-terminal .dashboard .request-list .request-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: border-bottom-color 0.2s, background-color 0.2s;
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal .dashboard .request-list .request-card:hover {
+    border-bottom-color: var(--highlight-color);
+    background-color: var(--hover-bg);
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-info .req-user {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--highlight-color);
+    margin-bottom: 0.25rem;
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-info .req-token {
+    font-size: 0.85rem;
+    color: var(--text-color);
+    margin-bottom: 0.2rem;
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-info .req-device {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    word-break: break-all;
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-info .req-device-text {
+    font-style: italic;
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button .fas {
+    margin-right: 0.35rem;
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button {
+    padding: 0.5rem 1rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+    box-shadow: var(--shadow-drop);
+    color: var(--text-muted);
+    background-color: var(--bg-tertiary);
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button:hover {
+    background-color: var(--hover-bg);
+    color: var(--text-color);
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button:active {
+    background-color: var(--bg-secondary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button.btn-approve {
+    color: var(--success-color);
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button.btn-approve:hover {
+    color: var(--text-color);
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button.btn-approve:active {
+    color: var(--text-muted);
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button.btn-deny {
+    color: var(--danger-color);
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button.btn-deny:hover {
+    color: var(--text-color);
+}
+
+.sys-terminal .dashboard .request-list .request-card .req-actions button.btn-deny:active {
+    color: var(--text-muted);
+}
+
+.sys-terminal .dashboard .empty-state {
+    color: var(--text-muted);
+    text-align: center;
+    padding: 2rem;
+    border: 1px dashed var(--border-color);
+}
+
+.sys-terminal .dashboard .user-login-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sys-terminal .dashboard .user-login-badge {
+    font-weight: bold;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    min-width: 3rem;
+    text-align: center;
+}
+
+.sys-terminal .dashboard .user-login-badge.badge-true {
+    background: var(--tak-bg);
+    color: var(--success-color);
+    border: 1px solid var(--success-color);
+}
+
+.sys-terminal .dashboard .user-login-badge.badge-false {
+    background: var(--nie-bg);
+    color: var(--danger-color);
+    border: 1px solid var(--danger-color);
+}
+
+.sys-terminal .dashboard .user-login-badge.badge-skip2fa {
+    background: var(--vs-vi-bg);
+    color: var(--info-color);
+    border: 1px solid var(--info-color);
+}
+
+.sys-terminal .dashboard .btn-toggle-login,
+.sys-terminal .dashboard .btn-toggle-skip2fa {
+    margin-left: auto;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: var(--shadow-drop);
+}
+
+.sys-terminal .dashboard .btn-toggle-login:hover,
+.sys-terminal .dashboard .btn-toggle-skip2fa:hover {
+    background: var(--hover-bg);
+}
+
+.sys-terminal .dashboard .user-login-hint {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.sys-terminal .status-console {
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    box-shadow: var(--shadow-drop);
+    border-left: 4px solid var(--highlight-color);
+    font-size: 0.85rem;
+    word-break: break-all;
+    white-space: pre-wrap;
+    color: var(--text-muted);
+}
+
+.sys-terminal .status-console.state-success {
+    border-left-color: var(--success-color);
+    color: var(--success-color);
+}
+
+.sys-terminal .status-console.state-error {
+    border-left-color: var(--danger-color);
+    color: var(--danger-color);
+}
+
+.sys-terminal .status-console.state-warning {
+    border-left-color: var(--warning-color);
+    color: var(--warning-color);
+}
+
+.sys-terminal .status-console.state-info {
+    border-left-color: var(--info-color);
+    color: var(--info-color);
+}

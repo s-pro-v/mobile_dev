@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="pl" theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <title>SYS.AUTH // Push Approval Protocol</title>
+    <link rel="stylesheet" href="css/logowanie.css">
+</head>
+
+<body>
+
+    <div class="sys-terminal">
+        <header>
+            <span class="sys-id">SEC_MODULE // AUTO_PUSH_AUTH</span>
+            <button class="theme-override" id="theme-btn"><i class="fas fa-moon"></i></button>
+        </header>
+
+        <!-- KROK 1 -->
+        <main class="auth-core" id="step-1">
+            <h1>Identyfikacja L1</h1>
+            <p>Wprowadź Name i klucz globalny. Wymagane autoryzowanie PUSH z konsoli administratora.</p>
+            <input type="text" id="sys-user" class="credential-input" placeholder="NAME (z GitHub)">
+            <input type="password" id="sys-pass" class="credential-input" placeholder="HASŁO GLOBALNE">
+            <button class="trigger-btn" id="login-trigger" disabled><i class="fas fa-right-to-bracket"></i>
+                Inicjalizacja środowiska...</button>
+        </main>
+
+        <!-- KROK 2 (AUTO PUSH WAIT) -->
+        <main class="auth-core hidden-step" id="step-2">
+            <h1>Autoryzacja PUSH</h1>
+            <p>Nasłuchiwanie na zezwolenie administratora dla węzła:
+                <span id="current-user-display" style="color: var(--highlight-color);"></span>
+            </p>
+
+            <div class="token-matrix" id="token-container">
+                <input type="number" class="crypt-input" readonly><input type="number" class="crypt-input"
+                    readonly><input type="number" class="crypt-input" readonly>
+                <input type="number" class="crypt-input" readonly><input type="number" class="crypt-input"
+                    readonly><input type="number" class="crypt-input" readonly>
+            </div>
+
+            <button class="trigger-btn" id="auth-trigger" disabled>
+                <span class="loader" id="wait-spinner"></span> <i class="fas fa-fingerprint"></i> Oczekiwanie na
+                sygnał...
+            </button>
+
+            <div class="aux-links">
+                <a href="#" id="cancel-trigger"><i class="fas fa-xmark"></i> Przerwij żądanie</a>
+                <a href="mobile/index.html" id="link-mobile-panel" class="hidden" style="margin-left: 1rem;"><i
+                        class="fas fa-mobile-screen"></i> Panel mobilny</a>
+                <a href="admin.html" id="link-admin-panel" class="hidden" style="margin-left: 1rem;"><i
+                        class="fas fa-user-shield"></i> Panel administratora</a>
+            </div>
+        </main>
+
+        <div class="status-console" id="status-log">[SYSTEM] Oczekiwanie na definicję klucza API...</div>
+    </div>
+
+    <script>
+        /**
+         * Klucz API GitHub – pobierany z auth.json (XOR), fallback: localStorage.
+         * auth.json: [{ "sys_pat": "<base64-XOR-encoded>" }]
+         */
+        const AUTH_JSON_URL = 'https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/dev/auth.json';
+        /** Klucz XOR – musi być taki sam jak przy kodowaniu sys_pat. */
+        const XOR_KEY = atob('dzVn');
+        let GITHUB_PAT = null;
+
+        function xorDecode(base64Encoded, key) {
+            const binary = atob(base64Encoded);
+            let out = '';
+            for (let i = 0; i < binary.length; i++) {
+                out += String.fromCharCode(binary.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            }
+            return out;
+        }
+
+        async function loadPat() {
+            try {
+                const pat = typeof localStorage !== 'undefined' && localStorage.getItem('sys_auth_github_pat');
+                if (pat && pat.trim() !== '') {
+                    GITHUB_PAT = pat.trim();
+                    return;
+                }
+            } catch (e) { /* ignore */ }
+            try {
+                const res = await fetch(AUTH_JSON_URL + '?t=' + Date.now());
+                if (!res.ok) throw new Error('auth.json ' + res.status);
+                const data = await res.json();
+                const item = Array.isArray(data) ? data[0] : data;
+                const enc = item && item.sys_pat;
+                if (!enc) throw new Error('Brak sys_pat w auth.json');
+                GITHUB_PAT = xorDecode(enc, XOR_KEY);
+            } catch (e) {
+                throw new Error('Nie można załadować klucza API: ' + (e.message || e));
+            }
+        }
+
+        const REPO_OWNER = 's-pro-v';
+        const REPO_NAME = 'json-lista';
+        const CREDENTIALS_FILE = 'dev/key_f2a.json';
+        const STATE_FILE = 'dev/sys_state.json';  // ten sam plik co w admin – żądania muszą trafiać do jednego pliku
+        const GLOBAL_PASS = 'start26'; // W produkcji: weryfikacja po stronie serwera
+        const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
+        /** Admin – ten użytkownik ma zawsze dostęp do logowania (zgodnie z admin.html). Zakodowane. */
+        const ADMIN_LOGIN_NAME = (function () { try { return atob('Um9iZXJ0cw=='); } catch (e) { return ''; } })();
+        /** Hasło dla Robertsa (inne niż GLOBAL_PASS). Zakodowane – base64. Np. btoa('twoje_haslo'). */
+        const ADMIN_PASS = (function () { try { return atob('YWRtaW4yNg=='); } catch (e) { return ''; } })();
+
+        let IDENTITY_MATRIX = {};
+        let ACTIVE_USER = null;
+        let POLLING_INTERVAL = null;
+
+        const DOM = {
+            step1: document.getElementById('step-1'),
+            step2: document.getElementById('step-2'),
+            userInput: document.getElementById('sys-user'),
+            linkAdminPanel: document.getElementById('link-admin-panel'),
+            passInput: document.getElementById('sys-pass'),
+            loginBtn: document.getElementById('login-trigger'),
+            authBtn: document.getElementById('auth-trigger'),
+            userDisp: document.getElementById('current-user-display'),
+            inputs: document.querySelectorAll('.crypt-input'),
+            tokenContainer: document.getElementById('token-container'),
+            status: document.getElementById('status-log'),
+            themeBtn: document.getElementById('theme-btn'),
+            cancelBtn: document.getElementById('cancel-trigger'),
+            spinner: document.getElementById('wait-spinner')
+        };
+
+        function updateLog(msg, state = 'default') {
+            DOM.status.textContent = msg;
+            DOM.status.className = 'status-console';
+            if (state === 'success') DOM.status.classList.add('state-success');
+            if (state === 'error') DOM.status.classList.add('state-error');
+            if (state === 'warning') DOM.status.classList.add('state-warning');
+        }
+
+        /** Powiadomienie przeglądarki – potwierdzenie decyzji admina */
+        async function ensureNotificationPermission() {
+            if (!('Notification' in window)) return false;
+            if (Notification.permission === 'granted') return true;
+            if (Notification.permission !== 'denied') {
+                const p = await Notification.requestPermission();
+                return p === 'granted';
+            }
+            return false;
+        }
+        function notifyUser(title, body) {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            try { new Notification(title, { body }); } catch (e) { /* ignore */ }
+        }
+
+        // --- GITHUB API HELPERS ---
+        const toBase64 = str => btoa(unescape(encodeURIComponent(str)));
+        const fromBase64 = b64 => decodeURIComponent(escape(atob(b64)));
+
+        async function githubGetFile(path) {
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?t=${Date.now()}`;
+            const res = await fetch(url, {
+                headers: {
+                    'Authorization': `token ${GITHUB_PAT}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            if (res.status === 404) return { sha: null, data: { active_sessions: {}, audit_log: [], pending_2fa: {}, access_permissions: {} } };
+            if (!res.ok) throw new Error(`API GET Error: ${res.status}`);
+
+            const fileData = await res.json();
+            const content = fromBase64(fileData.content).trim();
+
+            let parsedData = { active_sessions: {}, audit_log: [], pending_2fa: {}, access_permissions: {} };
+            if (content) {
+                try {
+                    parsedData = JSON.parse(content);
+                } catch (e) { }
+            }
+
+            // Zabezpieczenie struktury (gdyby plik był stary)
+            parsedData.pending_2fa = parsedData.pending_2fa || {};
+            parsedData.access_permissions = parsedData.access_permissions || {};
+            parsedData.active_sessions = parsedData.active_sessions || {};
+            parsedData.audit_log = parsedData.audit_log || [];
+
+            return { sha: fileData.sha, data: parsedData };
+        }
+
+        async function githubPutFile(path, dataObj, sha, commitMsg) {
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`;
+            const body = {
+                message: commitMsg,
+                content: toBase64(JSON.stringify(dataObj, null, 2))
+            };
+            if (sha) body.sha = sha;
+
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${GITHUB_PAT}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!res.ok) throw new Error(`API PUT Error: ${res.status}`);
+            return await res.json();
+        }
+
+        async function initCredentials() {
+            if (!GITHUB_PAT) {
+                updateLog('[KRYTYCZNE] Brak tokenu API. Ustaw: localStorage.setItem("sys_auth_github_pat", "ghp_TWOJ_TOKEN") i odśwież.', 'error');
+                return;
+            }
+
+            try {
+                const fileRes = await githubGetFile(CREDENTIALS_FILE);
+                if (fileRes.data && fileRes.data.workers && fileRes.data.workers.length) {
+                    const adminKey = (ADMIN_LOGIN_NAME || '').trim().toLowerCase();
+                    fileRes.data.workers.forEach(w => {
+                        if (!w.shifts || !w.shifts[2]) return;
+                        const canLogin = w.shifts[1] === "TRUE" || w.shifts[1] === true;
+                        const isAdmin = adminKey && w.name && String(w.name).trim().toLowerCase() === adminKey;
+                        if (canLogin || isAdmin) {
+                            const skip2fa = isAdmin || (w.shifts[3] === 'TRUE' || w.shifts[3] === true);
+                            IDENTITY_MATRIX[w.name.toLowerCase()] = {
+                                name: w.name,
+                                token: String(w.shifts[2]).replace(/\D/g, '').slice(0, 6),
+                                skip2fa: !!skip2fa
+                            };
+                        }
+                    });
+                    if (Object.keys(IDENTITY_MATRIX).length) {
+                        updateLog('[SYSTEM] Matryca wczytana. Tryb PUSH AUTH gotowy.', 'success');
+                        DOM.loginBtn.disabled = false;
+                        DOM.loginBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Zainicjuj sesję';
+                    } else {
+                        updateLog('[SYSTEM] Brak uprawnionych węzłów (workers z shifts[1]=TRUE).', 'warning');
+                    }
+                } else {
+                    updateLog('[SYSTEM] Brak pliku credentials lub brak workers w repozytorium.', 'warning');
+                }
+            } catch (e) {
+                updateLog(`[BŁĄD] Awaria pobierania z API: ${e.message}`, 'error');
+            }
+        }
+
+        /**
+         * L1 LOGIN & PUSH REQUEST TO GITHUB
+         */
+        async function handleLogin() {
+            const u = DOM.userInput.value.toLowerCase().trim();
+            const p = DOM.passInput.value.trim();
+            const node = IDENTITY_MATRIX[u];
+            const adminKey = (ADMIN_LOGIN_NAME || '').trim().toLowerCase();
+            const isAdminLogin = adminKey && u === adminKey;
+
+            if (!node) {
+                updateLog('[ODMOWA] Nieprawidłowy Name lub węzeł bez uprawnień.', 'error');
+                return;
+            }
+            if (isAdminLogin) {
+                if (p !== ADMIN_PASS) {
+                    updateLog('[ODMOWA] Nieprawidłowe hasło administratora.', 'error');
+                    return;
+                }
+            } else if (p !== GLOBAL_PASS) {
+                updateLog('[ODMOWA] Nieprawidłowy Name, klucz lub węzeł bez uprawnień.', 'error');
+                return;
+            }
+
+            DOM.loginBtn.disabled = true;
+            updateLog('[SYSTEM] Weryfikacja...', 'default');
+
+            try {
+                const { data, sha } = await githubGetFile(STATE_FILE);
+
+                const session = data.active_sessions[u];
+                if (session && (Date.now() - session.last_active < SESSION_TIMEOUT_MS)) {
+                    updateLog(`[BLOKADA] Węzeł ${node.name} posiada już aktywną sesję.`, 'error');
+                    DOM.loginBtn.disabled = false;
+                    DOM.loginBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Zainicjuj sesję';
+                    return;
+                }
+
+                if (node.skip2fa) {
+                    DOM.loginBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Logowanie bez potwierdzenia...';
+                    data.active_sessions[u] = { original_name: node.name, last_active: Date.now() };
+                    const ts = new Date().toLocaleString('pl-PL');
+                    data.audit_log = data.audit_log || [];
+                    data.audit_log.unshift(`[${ts}] AUTH_SUCCESS: Zalogowano (bez potwierdzenia) -> ${node.name}`);
+                    if (data.audit_log.length > 100) data.audit_log.pop();
+                    await githubPutFile(STATE_FILE, data, sha, `[SYS.AUTH] Logowanie bez potwierdzenia: ${node.name}`);
+                    try { localStorage.setItem('sys_auth_2fa_mobile', node.name); } catch (e) { }
+                    updateLog(`[SUKCES] Zalogowano (bez potwierdzenia): ${node.name}. Przekierowanie...`, 'success');
+                    window.location.href = 'mobile/index.html';
+                    return;
+                }
+
+                DOM.loginBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> PRZESYŁANIE ŻĄDANIA...';
+                updateLog('[SYSTEM] Przekazywanie żądania PUSH do administratora...', 'default');
+                var deviceInfo = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+                var deviceShort = deviceInfo ? (deviceInfo.length > 80 ? deviceInfo.substring(0, 77) + '...' : deviceInfo) : '—';
+                data.pending_2fa[u] = {
+                    time: Date.now(),
+                    token: (node.token || '').toString().replace(/\D/g, '').slice(0, 6),
+                    device: deviceInfo,
+                    deviceShort: deviceShort
+                };
+                await githubPutFile(STATE_FILE, data, sha, `[SYS.AUTH] Żądanie PUSH dla: ${node.name}`);
+
+                ACTIVE_USER = node;
+                DOM.step1.classList.add('hidden-step');
+                DOM.step2.classList.remove('hidden-step');
+                DOM.userDisp.textContent = node.name;
+                updateLog(`[SYSTEM] Żądanie wysłane. Oczekiwanie na sygnał z węzła nadrzędnego...`, 'warning');
+                ensureNotificationPermission();
+                startPolling();
+
+            } catch (e) {
+                updateLog(`[BŁĄD KRYTYCZNY] Komunikacja z GitHub API: ${e.message}`, 'error');
+                DOM.loginBtn.disabled = false;
+                DOM.loginBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Zainicjuj sesję';
+            }
+        }
+
+        /**
+         * POLLING: Sprawdzanie co 4 sekundy czy administrator kliknął ZATWIERDŹ
+         */
+        function startPolling() {
+            const userKey = ACTIVE_USER.name.toLowerCase();
+
+            POLLING_INTERVAL = setInterval(async () => {
+                try {
+                    const { data } = await githubGetFile(STATE_FILE);
+                    const status = data.access_permissions[userKey];
+
+                    if (status === 'GRANTED') {
+                        clearInterval(POLLING_INTERVAL);
+                        updateLog('[SYSTEM] Zezwolenie PUSH uzyskane. Pobieranie matrycy 2FA...', 'success');
+                        await ensureNotificationPermission();
+                        notifyUser('SYS.AUTH – potwierdzenie', 'Administrator zatwierdził dostęp. Zezwolenie PUSH uzyskane.');
+                        DOM.spinner.style.display = 'none';
+                        DOM.authBtn.innerHTML = '<i class="fas fa-fingerprint"></i> DEKODOWANIE...';
+
+                        // Uruchomienie wizualnego efektu wpisywania
+                        await autoTypeToken(ACTIVE_USER.token);
+                    }
+                    else if (status === 'DENIED') {
+                        clearInterval(POLLING_INTERVAL);
+                        updateLog('[ODMOWA] Administrator odrzucił żądanie dostępu.', 'error');
+                        await ensureNotificationPermission();
+                        notifyUser('SYS.AUTH – odrzucenie', 'Administrator odrzucił żądanie dostępu.');
+                        DOM.spinner.style.display = 'none';
+                        DOM.authBtn.innerHTML = '<i class="fas fa-xmark"></i> ODRZUCONO';
+                    }
+                    // Jeśli brak statusu - czekamy dalej
+                } catch (e) {
+                    console.warn('Polling error: ', e);
+                }
+            }, 4000); // Poll co 4 sekundy
+        }
+
+        /**
+         * EFEKT WIZUALNY: Automatyczne uzupełnienie 6 cyfr z opóźnieniem
+         */
+        async function autoTypeToken(token) {
+            DOM.tokenContainer.classList.add('typing-active');
+            const chars = token.split('');
+
+            for (let i = 0; i < 6; i++) {
+                DOM.inputs[i].value = chars[i];
+                DOM.inputs[i].style.borderColor = 'var(--highlight-color)';
+                DOM.inputs[i].style.boxShadow = 'inset 0 0 10px rgba(255, 115, 0, 0.4)';
+                // Symulacja opóźnienia uderzania w klawisze przez skrypt (150ms na znak)
+                await new Promise(r => setTimeout(r, 150));
+            }
+
+            updateLog('[SYSTEM] Kryptogram 2FA uzupełniony automatycznie. Ustanawianie sesji...', 'warning');
+            finalizeSession();
+        }
+
+        /**
+         * FINALIZACJA: Przeniesienie z access_permissions do active_sessions
+         */
+        async function finalizeSession() {
+            try {
+                const { data, sha } = await githubGetFile(STATE_FILE);
+                const userKey = ACTIVE_USER.name.toLowerCase();
+
+                // Czyszczenie i zapis logów
+                if (data.access_permissions[userKey]) delete data.access_permissions[userKey];
+
+                data.active_sessions[userKey] = {
+                    original_name: ACTIVE_USER.name,
+                    last_active: Date.now()
+                };
+
+                const timestampStr = new Date().toLocaleString('pl-PL');
+                data.audit_log.unshift(`[${timestampStr}] AUTH_SUCCESS: Zalogowano węzeł (PUSH AUTO) -> ${ACTIVE_USER.name}`);
+                if (data.audit_log.length > 100) data.audit_log.pop();
+
+                await githubPutFile(STATE_FILE, data, sha, `[SYS.AUTH] Finalizacja logowania: ${ACTIVE_USER.name}`);
+
+                try { localStorage.setItem('sys_auth_2fa_mobile', ACTIVE_USER.name); } catch (e) { }
+                const linkMobile = document.getElementById('link-mobile-panel');
+                if (linkMobile) { linkMobile.classList.remove('hidden'); }
+
+                DOM.authBtn.innerHTML = '<i class="fas fa-check"></i> TUNEL OTWARTY';
+                updateLog(`[SUKCES] Węzeł autoryzowany. Tunel operacyjny dla ${ACTIVE_USER.name} został w pełni otwarty. Przekierowanie...`, 'success');
+
+                /* Po poprawnym logowaniu – przejście do panelu mobilnego. */
+                window.location.href = 'mobile/index.html';
+
+            } catch (e) {
+                updateLog(`[BŁĄD KRYTYCZNY] Nie udało się zapisać sesji: ${e.message}`, 'error');
+            }
+        }
+
+        /**
+         * WYLOGOWANIE / ANULOWANIE
+         */
+        async function handleCancel(e) {
+            e.preventDefault();
+            if (POLLING_INTERVAL) clearInterval(POLLING_INTERVAL);
+
+            if (!ACTIVE_USER) { location.reload(); return; }
+
+            DOM.cancelBtn.textContent = 'Zamykanie...';
+            DOM.cancelBtn.style.pointerEvents = 'none';
+
+            try {
+                const { data, sha } = await githubGetFile(STATE_FILE);
+                const userKey = ACTIVE_USER.name.toLowerCase();
+                data.audit_log = data.audit_log || [];
+
+                let modified = false;
+                if (data.pending_2fa[userKey]) { delete data.pending_2fa[userKey]; modified = true; }
+                if (data.access_permissions[userKey]) { delete data.access_permissions[userKey]; modified = true; }
+                if (data.active_sessions[userKey]) { delete data.active_sessions[userKey]; modified = true; }
+
+
+                const ts = new Date().toLocaleString('pl-PL');
+                data.audit_log.unshift(`[${ts}] USER_LOGOUT: ${ACTIVE_USER.name} wylogował się.`);
+                if (data.audit_log.length > 100) data.audit_log.pop();
+                modified = true;
+
+                if (modified) {
+                    await githubPutFile(STATE_FILE, data, sha, `[SYS.AUTH] Przerwanie procedury/wylogowanie: ${ACTIVE_USER.name}`);
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                try { localStorage.removeItem('sys_auth_2fa_mobile'); } catch (e) { }
+                location.reload();
+            }
+        }
+
+        // Bindowanie zdarzeń DOM
+        DOM.loginBtn.addEventListener('click', handleLogin);
+        DOM.cancelBtn.addEventListener('click', handleCancel);
+
+        // Panel admina tylko dla Robertsa – pokaż link, gdy w polu Name wpisano Roberts
+        function toggleAdminLink() {
+            if (!DOM.linkAdminPanel) return;
+            const name = (DOM.userInput && DOM.userInput.value || '').trim().toLowerCase();
+            const admin = (ADMIN_LOGIN_NAME || '').trim().toLowerCase();
+            if (admin && name === admin) {
+                DOM.linkAdminPanel.classList.remove('hidden');
+            } else {
+                DOM.linkAdminPanel.classList.add('hidden');
+            }
+        }
+        if (DOM.userInput) DOM.userInput.addEventListener('input', toggleAdminLink);
+        if (DOM.userInput) DOM.userInput.addEventListener('change', toggleAdminLink);
+
+        // Obsługa zmiany motywu (jasny/ciemny)
+
+        const THEME_KEY = 'sys_auth_theme';
+
+        function applyTheme(theme) {
+            const value = theme === 'light' ? 'light' : 'dark';
+            document.documentElement.setAttribute('theme', value);
+            if (DOM && DOM.themeBtn) {
+                const icon = value === 'dark' ? 'fa-moon' : 'fa-sun';
+                DOM.themeBtn.innerHTML = `<i class="fas ${icon}"></i>`;
+            }
+            try { localStorage.setItem(THEME_KEY, value); } catch (e) { }
+        }
+
+        // Dodaj przycisk zmiany motywu jeśli nie istnieje
+        if (!DOM.themeBtn) {
+            DOM.themeBtn = document.createElement('button');
+            DOM.themeBtn.type = "button";
+            DOM.themeBtn.style.position = "fixed";
+            DOM.themeBtn.style.top = "12px";
+            DOM.themeBtn.style.right = "12px";
+            DOM.themeBtn.style.zIndex = "99";
+            DOM.themeBtn.style.fontFamily = "JetBrains Mono, Monaco, courier, monospace";
+            DOM.themeBtn.style.fontSize = "0.95rem";
+            DOM.themeBtn.style.padding = "6px 14px";
+            DOM.themeBtn.style.background = "var(--bg-tertiary)";
+            DOM.themeBtn.style.border = "1px solid var(--border-color)";
+            DOM.themeBtn.style.color = "var(--text-color)";
+            DOM.themeBtn.style.borderRadius = "20px";
+            DOM.themeBtn.style.boxShadow = "var(--shadow-drop)";
+            DOM.themeBtn.style.cursor = "pointer";
+            DOM.themeBtn.style.transition = "background 0.2s, color 0.2s";
+            DOM.themeBtn.innerHTML = (document.documentElement.getAttribute('theme') === 'dark') ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+            document.body.appendChild(DOM.themeBtn);
+        }
+
+        DOM.themeBtn.addEventListener('click', function () {
+            const isDark = document.documentElement.getAttribute('theme') === 'dark';
+            applyTheme(isDark ? 'light' : 'dark');
+        });
+
+        // Ustaw motyw na podstawie localStorage lub domyślnie
+        (function initTheme() {
+            try {
+                const saved = localStorage.getItem(THEME_KEY);
+                if (saved === 'light' || saved === 'dark') applyTheme(saved);
+                else applyTheme(document.documentElement.getAttribute('theme') || 'dark');
+            } catch (e) {
+                applyTheme('dark');
+            }
+        })();
+
+        // Autostart: załaduj klucz API (auth.json XOR lub localStorage), potem credentials
+        loadPat().then(function () { initCredentials(); }).catch(function (e) { updateLog('[BŁĄD] ' + (e.message || e), 'error'); });
+
+        // Brak możliwości cofania (przycisk Wstecz)
+        (function () {
+            if (typeof history === 'undefined' || !history.pushState) return;
+            history.pushState(null, '', location.href);
+            window.addEventListener('popstate', function () { history.pushState(null, '', location.href); });
+        })();
+    </script>
+</body>
+
+</html>

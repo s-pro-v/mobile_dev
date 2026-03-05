@@ -1,0 +1,25 @@
+{
+  "active_sessions": {
+    "jan.kowalski": {
+      "original_name": "Jan Kowalski",
+      "last_active": 1709560800000
+    }
+  },
+  "pending_2fa": {
+    "anna.nowak": {
+      "time": 1709560700000,
+      "token": "123456",
+      "device": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0...",
+      "deviceShort": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0..."
+    }
+  },
+  "access_permissions": {},
+  "audit_log": [
+    "[04.03.2025, 12:00:00] AUTH_SUCCESS: Zalogowano węzeł (PUSH AUTO) -> Jan Kowalski",
+    "[04.03.2025, 11:58:00] AUTH_SUCCESS: Zalogowano (bez potwierdzenia) -> Roberts",
+    "[04.03.2025, 11:55:00] ADMIN_ACTION: ZATWIERDZONO dostęp dla -> ANNA.NOWAK",
+    "[04.03.2025, 11:50:00] Żądanie PUSH dla: Anna Nowak",
+    "[04.03.2025, 11:45:00] USER_LOGOUT: Jan Kowalski wylogował się (mobile).",
+    "[04.03.2025, 11:40:00] USER_LOGOUT: Anna Nowak wylogował się."
+  ]
+}

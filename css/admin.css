@@ -56,18 +56,29 @@ body::before {
     align-items: center;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 1rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     padding: 0.2rem;
-    box-shadow: var(--shadow-inset);
+    box-shadow: var(--shadow-drop);
+    position: sticky;
+    top: 0;
 }
 
 .sys-terminal header .sys-id {
     font-weight: bold;
     letter-spacing: 2px;
     color: var(--text-muted);
-    padding: 0.2rem 0.5rem;
+    padding: 0.2rem 0.2rem;
+    box-shadow: var(--shadow-drop);
+    width: 100%;
+    height: 34.3px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    margin-right: 0.2rem;
 }
 
 .sys-terminal header .controls {
@@ -119,6 +130,22 @@ body::before {
 
 .sys-terminal header .controls .header-link:hover {
     background: var(--hover-bg);
+    color: var(--warning-color);
+}
+
+.sys-terminal header .controls .header-link:active {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal header .controls .header-link i {
+    color: var(--warning-color);
+    transition: all 0.2s ease;
+    margin-right: 0.2rem;
+}
+
+.sys-terminal header .controls .header-link:hover i {
     color: var(--text-color);
 }
 
@@ -190,6 +217,7 @@ body::before {
     padding: 0.5rem;
     box-shadow: var(--shadow-inset);
     overflow-x: auto;
+    background: var(--bg-color);
 }
 
 .sys-terminal .dashboard .ustawienia-table {
@@ -213,10 +241,6 @@ body::before {
     letter-spacing: 0.05em;
 }
 
-.sys-terminal .dashboard .ustawienia-table tbody tr:nth-child(even) {
-    background-color: color-mix(in srgb, var(--border-color) 15%, var(--bg));
-}
-
 .sys-terminal .dashboard .ustawienia-table .ustawienia-input {
     width: 100%;
     min-width: 0;
@@ -226,7 +250,16 @@ body::before {
     border: 1px solid var(--border-color);
     color: var(--text-color);
     box-sizing: border-box;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-left: 1px solid var(--border-color);
+    background: var(--card-bg);
 }
+
+
+
 
 .sys-terminal .dashboard .ustawienia-table .btn-remove-group {
     padding: 0.2rem 0.4rem;
@@ -617,7 +650,9 @@ body::before {
 
 /* --- MOBILE (telefon) --- */
 @media (max-width: 600px) {
-    html, body {
+
+    html,
+    body {
         overflow-x: hidden;
     }
 
@@ -792,4 +827,222 @@ body::before {
         padding: 0.5rem 0.6rem;
         align-items: center;
     }
+}
+
+
+
+.ustawienia-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-family);
+    margin-top: 10px;
+    background: var(--panel-bg);
+    box-shadow: var(--shadow-drop);
+
+    & thead {
+        background: var(--metal-gradient);
+        border-bottom: 2px solid var(--highlight-color);
+        height: 1rem;
+
+        & th {
+            padding: 10px;
+            text-align: left;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+    }
+
+    & tbody tr {
+        border-bottom: 1px solid var(--border-color);
+        transition: background-color var(--transition-speed);
+
+        &:hover {
+            background-color: var(--hover-bg);
+            background-image: var(--bg-stripe-pattern);
+            background-size: 10px 10px;
+        }
+
+        & td {
+            padding: 8px;
+            vertical-align: middle;
+        }
+    }
+
+    /* Stylizacja inputów wewnątrz tabeli */
+    .ustawienia-input {
+        width: 100%;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        font-family: var(--font-family);
+        font-size: 0.75rem;
+        padding: 6px 10px;
+        box-shadow: var(--shadow-inset);
+        transition: all var(--transition-speed);
+        border-radius: 0 !important;
+
+        &:focus {
+            border-bottom-color: var(--highlight-color);
+            background: var(--bg-primary);
+            outline: none;
+        }
+
+        /* Szerokości specyficzne dla kolumn */
+        &.ustawienia-min {
+            width: 80px;
+            text-align: center;
+            color: var(--info-color);
+            font-weight: bold;
+        }
+
+        &.ustawienia-code {
+            width: 100px;
+            text-transform: uppercase;
+            color: var(--highlight-color);
+        }
+
+        &.ustawienia-name {
+            color: var(--text-primary);
+        }
+    }
+
+    /* Przycisk usuwania */
+    .btn-remove-group {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--danger-color);
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all var(--transition-speed);
+        box-shadow: var(--shadow-drop);
+        border-radius: 0 !important;
+        margin-left: 1rem;
+
+        &:hover {
+            background: var(--danger-color);
+            color: white;
+            border-color: var(--danger-color);
+        }
+
+        &:active {
+            box-shadow: var(--shadow-inset);
+        }
+
+        & i {
+            font-size: 0.85rem;
+        }
+    }
+}
+
+
+/* record_spinner.css - Protokół kontroli bufora danych */
+
+.record-count-spinner {
+    display: flex;
+    align-items: stretch;
+    background: var(--bg-tertiary);
+    border: 0px solid var(--border-color);
+    box-shadow: var(--shadow-inset);
+    height: 36px;
+    width: 100%;
+    max-width: 60px;
+    font-family: var(--font-main);
+    transition: border-color var(--transition-speed);
+    color: var(--text-muted);
+    outline: 1px solid var(--border-color);
+    outline-offset: -2px;
+    outline-width: 2px;
+
+    &:focus-within {
+        border-bottom-color: var(--highlight-color);
+    }
+
+    & input[type="number"] {
+        flex: 1;
+        min-width: 0;
+        width: auto;
+        background: transparent;
+        border: 1px solid var(--border-color);
+        padding: 6px 8px;
+        color: var(--text-primary);
+        font-family: var(--font-main);
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-align: center;
+        border-radius: 0 !important;
+        -moz-appearance: textfield;
+        appearance: textfield;
+
+        &::-webkit-outer-spin-button,
+        &::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        &:focus {
+            outline: none;
+            box-shadow: none;
+        }
+    }
+
+    .record-count-arrows {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        border-left: 1px solid var(--border-color);
+        background: var(--card-bg);
+
+        .record-count-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 50%;
+            min-height: 16px;
+            padding: 0;
+            border: none;
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            transition: all var(--transition-speed);
+            border-radius: 0 !important;
+
+            &:hover {
+                color: var(--highlight-color);
+                background: var(--hover-bg);
+            }
+
+            &:active {
+                background: var(--bg-tertiary);
+                box-shadow: var(--shadow-inset);
+            }
+
+            &.record-count-arrow-up {
+                border-bottom: 1px solid var(--border-color);
+            }
+        }
+    }
+}
+
+.sys-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    box-shadow: var(--shadow-inset);
+    padding: 0.2rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    margin: 0.1rem;
+    outline: 2px solid var(--bg-tertiary);
+    outline-offset: -1px;
+    outline-width: 5px;
 }

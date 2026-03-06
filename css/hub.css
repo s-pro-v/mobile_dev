@@ -53,6 +53,9 @@ body::before {
     font-weight: 700;
     letter-spacing: 0.2em;
     color: var(--text-muted);
+    background: var(--bg-color);
+    padding: 0.7rem 1rem;
+    box-shadow: var(--shadow-drop);
 }
 
 .hub-theme-btn {
@@ -71,12 +74,12 @@ body::before {
 
 .hub-theme-btn:hover {
     background: var(--hover-bg);
-    border-color: var(--highlight-color);
     color: var(--highlight-color);
 }
 
 .hub-theme-btn:active {
     box-shadow: var(--shadow-inset);
+    color: var(--text-muted);
 }
 
 .hub-main {
@@ -86,6 +89,7 @@ body::before {
     box-shadow: var(--shadow-drop);
     background-image: var(--bg-stripe-pattern);
     background-size: var(--bg-stripe-size);
+    background-color: var(--bg-color);
 }
 
 .hub-title {
@@ -97,6 +101,8 @@ body::before {
     border-bottom: 3px solid var(--highlight-color);
     padding-bottom: 0.5rem;
     display: inline-block;
+    background: var(--bg-color);
+    padding: 0.2rem 0.5rem;
 }
 
 .hub-desc {
@@ -104,6 +110,9 @@ body::before {
     font-size: 0.85rem;
     color: var(--text-muted);
     line-height: 1.5;
+    background: var(--bg-color);
+    padding: 0.2rem 0.5rem;
+    box-shadow: var(--shadow-inset);
 }
 
 .hub-nav {
@@ -138,7 +147,6 @@ body::before {
 }
 
 .hub-card:hover {
-    border-color: var(--highlight-color);
     background: var(--hover-bg);
     color: var(--highlight-color);
     box-shadow: var(--shadow-hover);
@@ -146,6 +154,7 @@ body::before {
 
 .hub-card:active {
     box-shadow: var(--shadow-inset);
+    color: var(--text-muted);
 }
 
 .hub-card-icon {
@@ -165,6 +174,11 @@ body::before {
     color: var(--highlight-color);
 }
 
+.hub-card:active .hub-card-icon {
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+}
+
 .hub-card-label {
     font-weight: 600;
     font-size: 0.95rem;
@@ -181,7 +195,9 @@ body::before {
 
 /* --- MOBILE --- */
 @media (max-width: 600px) {
-    html, body {
+
+    html,
+    body {
         overflow-x: hidden;
     }
 

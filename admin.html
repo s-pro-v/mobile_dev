@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&family=Share+Tech+Mono&display=swap"
         rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg' fill='none' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpolygon points='60,5 110,32 110,88 60,115 10,88 10,32' stroke='%23292929' stroke-width='6'/%3E%3Cpolyline points='35,45 35,25 45,35 60,15 75,35 85,25 85,45' stroke='%23f39a2b' stroke-width='4'/%3E%3Cpolygon points='30,55 90,55 90,95 30,95' stroke='%23949494' stroke-width='4'/%3E%3Cpolyline points='40,65 50,75 40,85' stroke='%23f39a2b' stroke-width='4'/%3E%3Crect x='55' y='79' width='20' height='6' fill='%23f39a2b' stroke='none'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>SYS.ADMIN // Approval Terminal</title>
@@ -15,13 +17,15 @@
 
     <div class="sys-terminal">
         <header>
-            <span class="sys-id">SYS.ADMIN</span>
-            <div class="controls">
-                <a href="index.html" class="header-link" title="Strona startowa"><i class="fas fa-home"></i> Hub</a>
-                <a href="mobile/index.html" class="header-link" title="Panel mobilny"><i
-                        class="fas fa-mobile-screen"></i> Mobile</a>
-                <button id="refresh-btn" title="Odśwież macierz"><i class="fas fa-arrows-rotate"></i></button>
-                <button id="theme-btn" title="Zmiana motywu"><i class="fas fa-moon" id="theme-icon"></i></button>
+            <div class="sys-container">
+                <span class="sys-id">SYS.ADMIN</span>
+                <div class="controls">
+                    <a href="index.html" class="header-link" title="Strona startowa"><i class="fas fa-home"></i> Hub</a>
+                    <a href="mobile/index.html" class="header-link" title="Panel mobilny"><i
+                            class="fas fa-mobile-screen"></i> Mobile</a>
+                    <button id="refresh-btn" title="Odśwież macierz"><i class="fas fa-arrows-rotate"></i></button>
+                    <button id="theme-btn" title="Zmiana motywu"><i class="fas fa-moon" id="theme-icon"></i></button>
+                </div>
             </div>
         </header>
 
@@ -492,7 +496,7 @@
                 const code = String(g.code || '');
                 const name = String(g.name || '');
                 tr.innerHTML =
-                    '<td><input type="number" class="ustawienia-input ustawienia-min" value="' + escapeHtml(String(min)) + '" min="1" step="1"></td>' +
+                    '<td><div class="record-count-spinner"><input type="number" class="ustawienia-input ustawienia-min" value="' + escapeHtml(String(min)) + '" min="1" step="1"><div class="record-count-arrows"><button type="button" class="record-count-arrow record-count-arrow-up" title="Zwiększ" aria-label="Zwiększ" onclick="this.parentElement.previousElementSibling.stepUp()">▲</button><button type="button" class="record-count-arrow record-count-arrow-down" title="Zmniejsz" aria-label="Zmniejsz" onclick="this.parentElement.previousElementSibling.stepDown()">▼</button></div></div></td>' +
                     '<td><input type="text" class="ustawienia-input ustawienia-code" value="' + escapeHtml(code) + '" maxlength="8"></td>' +
                     '<td><input type="text" class="ustawienia-input ustawienia-name" value="' + escapeHtml(name) + '" placeholder="np. SEKCJA D"></td>' +
                     '<td><button type="button" class="btn-remove-group" title="Usuń grupę"><i class="fas fa-trash-can"></i></button></td>';
@@ -507,7 +511,7 @@
                 const t = table.querySelector('tbody');
                 const tr = document.createElement('tr');
                 tr.innerHTML =
-                    '<td><input type="number" class="ustawienia-input ustawienia-min" value="1" min="1" step="1"></td>' +
+                    '<td><div class="record-count-spinner"><input type="number" class="ustawienia-input ustawienia-min" value="1" min="1" step="1"><div class="record-count-arrows"><button type="button" class="record-count-arrow record-count-arrow-up" title="Zwiększ" aria-label="Zwiększ" onclick="this.parentElement.previousElementSibling.stepUp()">▲</button><button type="button" class="record-count-arrow record-count-arrow-down" title="Zmniejsz" aria-label="Zmniejsz" onclick="this.parentElement.previousElementSibling.stepDown()">▼</button></div></div></td>' +
                     '<td><input type="text" class="ustawienia-input ustawienia-code" value="" maxlength="8"></td>' +
                     '<td><input type="text" class="ustawienia-input ustawienia-name" value="" placeholder="np. SEKCJA X"></td>' +
                     '<td><button type="button" class="btn-remove-group" title="Usuń grupę"><i class="fas fa-trash-can"></i></button></td>';
@@ -888,7 +892,26 @@
             document.querySelectorAll('[draggable="true"]').forEach((el) => {
                 el.removeAttribute("draggable");
             });
+
+            // Prevent dragstart event
+            document.addEventListener("dragstart", function (e) {
+                e.preventDefault();
+                return false;
+            });
+
+            // Prevent drop event
+            document.addEventListener("drop", function (e) {
+                e.preventDefault();
+                return false;
+            });
+
+            // Prevent dragover event
+            document.addEventListener("dragover", function (e) {
+                e.preventDefault();
+                return false;
+            });
         });
+
     </script>
 </body>
 

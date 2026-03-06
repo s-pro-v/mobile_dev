@@ -15,10 +15,6 @@ Aplikacja logowania 2FA z zatwierdzaniem PUSH, panelem admina i terminalem mobil
 │   ├── index.html      ← terminal mobilny (grafik zmiany)
 │   ├── index.js
 │   └── index.css
-├── dev/
-│   ├── README.md       ← opis plików stanu, integracja, konfiguracja
-│   ├── sys_state.example.json
-│   └── app_config..json (example)
 └── README.md           ← ten plik
 ```
 

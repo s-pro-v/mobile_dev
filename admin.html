@@ -6,7 +6,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&family=Share+Tech+Mono&display=swap"
         rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>SYS.ADMIN // Approval Terminal</title>
     <link rel="stylesheet" href="css/admin.css">
 </head>
@@ -15,10 +15,9 @@
 
     <div class="sys-terminal">
         <header>
-            <span class="sys-id">SYS.ADMIN // 2FA_APPROVAL_NODE</span>
+            <span class="sys-id">SYS.ADMIN</span>
             <div class="controls">
-                <a href="logowanie.html" class="header-link" title="Strona logowania"><i
-                        class="fas fa-right-to-bracket"></i> Logowanie</a>
+                <a href="index.html" class="header-link" title="Strona startowa"><i class="fas fa-home"></i> Hub</a>
                 <a href="mobile/index.html" class="header-link" title="Panel mobilny"><i
                         class="fas fa-mobile-screen"></i> Mobile</a>
                 <button id="refresh-btn" title="Odśwież macierz"><i class="fas fa-arrows-rotate"></i></button>
@@ -57,6 +56,25 @@
                     (shifts[3]).</p>
                 <div class="session-list" id="users-can-login-container">
                     <div class="empty-state">Odśwież, aby wczytać listę.</div>
+                </div>
+            </section>
+
+            <section class="dashboard-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-sliders" style="color: var(--text-muted);"></i> Ustawienia grup
+                        (ustawienia.json)</h2>
+                    <div class="section-actions">
+                        <button type="button" id="save-ustawienia-btn" title="Zapisz zmiany w repo"><i
+                                class="fas fa-save"></i> Zapisz ustawienia</button>
+                        <button type="button" id="add-group-btn" title="Dodaj nową grupę"><i class="fas fa-plus"></i>
+                            Dodaj grupę</button>
+                    </div>
+                </div>
+                <p class="section-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    Grupy dla panelu mobilnego: min = od której pozycji na liście (1., 2., 3. …); max liczony
+                    automatycznie. Wymagany token zapisu.</p>
+                <div class="ustawienia-table-wrap" id="ustawienia-container">
+                    <div class="empty-state">Odśwież, aby wczytać ustawienia.</div>
                 </div>
             </section>
 
@@ -131,6 +149,7 @@
         const REPO_NAME = 'json-lista';     // nazwa repozytorium
         const STATE_FILE = 'dev/sys_state.json';  // ścieżka do pliku ze stanem 2FA
         const CREDENTIALS_FILE = 'dev/key_f2a.json';  // lista użytkowników (workers), shifts[1]===TRUE = może się zalogować
+        const USTAWIENIA_FILE = 'ustawienia.json';  // grupy dla mobile (min, max, code, name)
         /** Admin – ten użytkownik ma zawsze dostęp do logowania (nie można wyłączyć). */
         const ADMIN_LOGIN_NAME = 'Roberts';
 
@@ -142,11 +161,14 @@
             sessionsContainer: document.getElementById('sessions-container'),
             auditContainer: document.getElementById('audit-container'),
             usersCanLoginContainer: document.getElementById('users-can-login-container'),
+            ustawieniaContainer: document.getElementById('ustawienia-container'),
             refreshBtn: document.getElementById('refresh-btn'),
             themeBtn: document.getElementById('theme-btn'),
             status: document.getElementById('status-log'),
             html: document.documentElement
         };
+
+        const URL_USTAWIENIA = 'https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/ustawienia.json';
 
         function updateLog(msg, state = 'default') {
             DOM.status.textContent = msg;
@@ -262,6 +284,32 @@
             return { sha: fileData.sha, data: data };
         }
 
+        /** Pobiera ustawienia.json (grupy) przez API – zwraca sha do zapisu. */
+        async function githubGetUstawienia() {
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${USTAWIENIA_FILE}?t=${Date.now()}`;
+            let res;
+            try {
+                res = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+            } catch (e) {
+                throw new Error('Połączenie odrzucone (Failed to fetch).');
+            }
+            if (res.status === 404) return { sha: null, data: { groups: [] } };
+            if (!res.ok) throw new Error(`API GET Error: ${res.status}`);
+            const fileData = await res.json();
+            const content = fromBase64(fileData.content).trim();
+            let data = { groups: [] };
+            if (content) {
+                try { data = JSON.parse(content); } catch (e) { }
+            }
+            if (!Array.isArray(data.groups)) data.groups = [];
+            return { sha: fileData.sha, data: data };
+        }
+
         /**
          * Skanowanie macierzy sys_state
          */
@@ -302,6 +350,7 @@
                 renderActiveSessions(sessions);
                 renderAuditLog(data.audit_log || []);
                 fetchAndRenderUsersCanLogin();
+                fetchAndRenderUstawienia();
 
                 if (newKeys.length > 0) {
                     await ensureNotificationPermission();
@@ -358,6 +407,96 @@
                 DOM.auditContainer.appendChild(el);
             });
         }
+
+        /** Ustawienia grup – odczyt przez API (z sha do zapisu) lub raw (tylko podgląd). */
+        let _ustawieniaCache = { sha: null, data: null };
+        async function fetchAndRenderUstawienia() {
+            if (!DOM.ustawieniaContainer) return;
+            try {
+                if (getToken()) {
+                    const { sha, data } = await githubGetUstawienia();
+                    _ustawieniaCache = { sha, data: data || { groups: [] } };
+                    renderUstawieniaEditable(_ustawieniaCache.data.groups);
+                } else {
+                    const res = await fetch(URL_USTAWIENIA + '?t=' + Date.now());
+                    if (!res.ok) throw new Error(res.status);
+                    const data = await res.json();
+                    _ustawieniaCache = { sha: null, data: { groups: Array.isArray(data.groups) ? data.groups : [] } };
+                    renderUstawieniaEditable(_ustawieniaCache.data.groups);
+                }
+            } catch (e) {
+                DOM.ustawieniaContainer.innerHTML = '<div class="empty-state">Nie można pobrać ustawień (' + (e.message || 'błąd sieci') + '). Ustaw token, aby edytować.</div>';
+            }
+        }
+        function renderUstawieniaEditable(groups) {
+            DOM.ustawieniaContainer.innerHTML = '';
+            const table = document.createElement('table');
+            table.className = 'ustawienia-table';
+            table.innerHTML = '<thead><tr><th>min (od pozycji)</th><th>code</th><th>name</th><th></th></tr></thead><tbody></tbody>';
+            const tbody = table.querySelector('tbody');
+            (groups || []).forEach((g, idx) => {
+                const tr = document.createElement('tr');
+                tr.dataset.index = idx;
+                const min = g.min != null ? Number(g.min) : '';
+                const code = String(g.code || '');
+                const name = String(g.name || '');
+                tr.innerHTML =
+                    '<td><input type="number" class="ustawienia-input ustawienia-min" value="' + escapeHtml(String(min)) + '" min="1" step="1"></td>' +
+                    '<td><input type="text" class="ustawienia-input ustawienia-code" value="' + escapeHtml(code) + '" maxlength="8"></td>' +
+                    '<td><input type="text" class="ustawienia-input ustawienia-name" value="' + escapeHtml(name) + '" placeholder="np. SEKCJA D"></td>' +
+                    '<td><button type="button" class="btn-remove-group" title="Usuń grupę"><i class="fas fa-trash-can"></i></button></td>';
+                tbody.appendChild(tr);
+                tr.querySelector('.btn-remove-group').addEventListener('click', () => tr.remove());
+            });
+            DOM.ustawieniaContainer.appendChild(table);
+            const saveBtn = document.getElementById('save-ustawienia-btn');
+            const addBtn = document.getElementById('add-group-btn');
+            if (saveBtn) saveBtn.onclick = processSaveUstawienia;
+            if (addBtn) addBtn.onclick = () => {
+                const t = table.querySelector('tbody');
+                const tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td><input type="number" class="ustawienia-input ustawienia-min" value="1" min="1" step="1"></td>' +
+                    '<td><input type="text" class="ustawienia-input ustawienia-code" value="" maxlength="8"></td>' +
+                    '<td><input type="text" class="ustawienia-input ustawienia-name" value="" placeholder="np. SEKCJA X"></td>' +
+                    '<td><button type="button" class="btn-remove-group" title="Usuń grupę"><i class="fas fa-trash-can"></i></button></td>';
+                t.appendChild(tr);
+                tr.querySelector('.btn-remove-group').addEventListener('click', () => tr.remove());
+            };
+        }
+        window.processSaveUstawienia = async function () {
+            if (!getToken()) {
+                updateLog('[KRYTYCZNE] Ustaw token (GITHUB_PAT / sys_auth_github_pat), aby zapisać ustawienia.', 'error');
+                return;
+            }
+            const tbody = DOM.ustawieniaContainer.querySelector('.ustawienia-table tbody');
+            if (!tbody) return;
+            const rows = tbody.querySelectorAll('tr');
+            const mins = [];
+            for (let i = 0; i < rows.length; i++) {
+                const r = rows[i];
+                const min = parseInt(r.querySelector('.ustawienia-min').value, 10);
+                const code = (r.querySelector('.ustawienia-code').value || '').trim();
+                const name = (r.querySelector('.ustawienia-name').value || '').trim();
+                if (isNaN(min) || min < 1) { updateLog('[BŁĄD] Nieprawidłowa wartość min (od 1) w wierszu ' + (i + 1), 'error'); return; }
+                mins.push({ min, code, name });
+            }
+            mins.sort((a, b) => a.min - b.min);
+            const groups = mins.map((item, i) => {
+                const max = i < mins.length - 1 ? mins[i + 1].min - 1 : 999999;
+                return { min: item.min, max, code: item.code, name: item.name };
+            });
+            updateLog('[SYSTEM] Zapis ustawień grup (ustawienia.json)...', 'warning');
+            try {
+                await githubPutFile(USTAWIENIA_FILE, { groups }, _ustawieniaCache.sha, '[SYS.ADMIN] Zmiana ustawień grup');
+                const { sha, data } = await githubGetUstawienia();
+                _ustawieniaCache = { sha, data: data || { groups: [] } };
+                updateLog('[SUKCES] Ustawienia zapisane.', 'success');
+                renderUstawieniaEditable(_ustawieniaCache.data.groups);
+            } catch (err) {
+                updateLog('[BŁĄD] ' + err.message, 'error');
+            }
+        };
 
         /** Lista użytkowników uprawnionych do logowania (z key_f2a.json). */
         let _credentialsCache = { sha: null, data: null };
@@ -652,6 +791,14 @@
             history.pushState(null, '', location.href);
             window.addEventListener('popstate', function () { history.pushState(null, '', location.href); });
         })();
+
+        // Add these to your existing script section
+        document.addEventListener("DOMContentLoaded", function () {
+            // Remove draggable attribute from all elements
+            document.querySelectorAll('[draggable="true"]').forEach((el) => {
+                el.removeAttribute("draggable");
+            });
+        });
     </script>
 </body>
 

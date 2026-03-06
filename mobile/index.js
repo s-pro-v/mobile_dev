@@ -30,6 +30,9 @@ delete window.__G;
 const URL_SCHEDULE_MAIN = "https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/mobile-grafik.json";
 /** Fallback na gałąź master, gdy main nie odpowie. */
 const URL_SCHEDULE_MASTER = "https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/master/mobile-grafik.json";
+/** Ustawienia grup (min/max/code/name) – źródło grup dla mobile. */
+const URL_USTAWIENIA_MAIN = "https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/ustawienia.json";
+const URL_USTAWIENIA_MASTER = "https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/master/ustawienia.json";
 /** Tryb testu: true gdy adres zawiera ?test (np. index.html?test). Używa tej samej ścieżki co główna. */
 const useTestSchedule = typeof URLSearchParams !== "undefined" && new URLSearchParams(window.location.search).get("test") != null;
 /** Sesja 2FA z logowanie.html (SYS.AUTH) – wymagana do wejścia na panel mobilny; po wylogowaniu czyścimy. */
@@ -97,22 +100,31 @@ function checkAccessStillValid() {
 
 function updateHeaderActiveKey() {
     const el = document.getElementById("active-key-display-header");
-    if (!el) return;
-    try {
-        let label = escapeHtml(headerUpdateLabel);
+    const dateEl = document.getElementById("header-date-display");
+    if (el) {
         try {
-            const userName = localStorage.getItem(SYS_AUTH_2FA_STORAGE);
-            if (userName && userName.trim()) {
-                label = "Zalogowany: " + escapeHtml(first3Letters(userName)) + " · " + label;
-            }
-        } catch (e) { }
-        el.innerHTML = "<i data-lucide=\"refresh-cw\" class=\"update-icon-inline\" aria-hidden=\"true\"></i> " + label;
-        if (headerUpdateIsNew) el.classList.add("update-new");
-        else el.classList.remove("update-new");
-        if (typeof lucide !== "undefined" && lucide.createIcons) lucide.createIcons();
-    } catch (e) {
-        el.textContent = "";
-        el.classList.remove("update-new");
+            let label = "";
+            try {
+                const userName = localStorage.getItem(SYS_AUTH_2FA_STORAGE);
+                if (userName && userName.trim()) {
+                    label = "Zalogowany: " + escapeHtml(first3Letters(userName));
+                }
+            } catch (e) { }
+            el.innerHTML = "<i data-lucide=\"refresh-cw\" class=\"update-icon-inline\" aria-hidden=\"true\"></i> " + label;
+            if (typeof lucide !== "undefined" && lucide.createIcons) lucide.createIcons();
+        } catch (e) {
+            el.textContent = "";
+        }
+    }
+    if (dateEl) {
+        try {
+            dateEl.textContent = headerUpdateLabel ? "|" + headerUpdateLabel : "";
+            if (headerUpdateIsNew) dateEl.classList.add("update-new");
+            else dateEl.classList.remove("update-new");
+        } catch (e) {
+            dateEl.textContent = "";
+            dateEl.classList.remove("update-new");
+        }
     }
 }
 
@@ -236,6 +248,16 @@ function doLogout() {
     });
 }
 
+/** Uzupełnia max w grupach (auto: następna grupa min - 1, ostatnia = 999999). */
+function normaliseGroups(sett) {
+    if (!sett || !Array.isArray(sett.groups)) return;
+    const g = sett.groups.slice().sort((a, b) => Number(a.min) - Number(b.min));
+    g.forEach((gr, i) => {
+        if (gr.max == null || gr.max === "") gr.max = i < g.length - 1 ? Number(g[i + 1].min) - 1 : 999999;
+    });
+    sett.groups = g;
+}
+
 // --- STATE ---
 let scheduleData = null;
 /** Tablica miesięcy: [{ meta, workers }, ...]. Dla jednego miesiąca z JSON: [sched]. */
@@ -299,29 +321,72 @@ function displayShiftCode(code) {
 
 // --- LOGIC HELPER: GROUP MAPPING ---
 
-/**
- * Pobiera dane grupy (klasę CSS i nazwę) na podstawie ID pracownika i pliku ustawień.
- */
-function getWorkerGroupInfo(id) {
-    const workerId = parseInt(id);
+/** Mapowanie: klucz pracownika (id|name) → pozycja (1, 2, 3, …). Unikalny klucz przy duplikatach ID. */
+let _workerPositionMap = {};
+let _workerPositionMapForSchedule = null;
 
-    // Domyślne wartości (jeśli brak ustawień)
+function _workerKey(w) {
+    const id = w && w.id != null ? String(w.id) : "";
+    const name = w && w.name != null ? String(w.name) : "";
+    return id + "|" + name;
+}
+
+/** Buduje mapę (id|name) → pozycja (1-based). Sort: po ID liczbowo, potem po id jako string, potem po name (stabilne). */
+function buildWorkerPositionMap() {
+    _workerPositionMap = {};
+    if (!scheduleData || !Array.isArray(scheduleData.workers)) return;
+    const sorted = [...scheduleData.workers].sort((a, b) => {
+        const na = parseInt(a.id, 10);
+        const nb = parseInt(b.id, 10);
+        if (na !== nb) return na - nb;
+        const sa = String(a.id || "");
+        const sb = String(b.id || "");
+        if (sa !== sb) return sa.localeCompare(sb);
+        return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+    sorted.forEach((w, i) => {
+        const key = _workerKey(w);
+        if (key !== "|") _workerPositionMap[key] = i + 1;
+    });
+    _workerPositionMapForSchedule = scheduleData;
+}
+
+/**
+ * Pobiera dane grupy na podstawie POZYCJI pracownika na liście. min/max = zakres pozycji.
+ * Wywołaj z obiektem worker (id + name), żeby przy duplikatach ID każda osoba miała poprawną pozycję.
+ */
+function getWorkerGroupInfo(idOrWorker) {
     let result = { className: "", name: "", code: "" };
 
-    if (settingsData && settingsData.groups) {
-        // Szukamy grupy, do której pasuje ID
-        const group = settingsData.groups.find(
-            (g) => workerId >= g.min && workerId <= g.max,
+    if (_workerPositionMapForSchedule !== scheduleData && scheduleData) buildWorkerPositionMap();
+
+    const key = typeof idOrWorker === "object" && idOrWorker !== null
+        ? _workerKey(idOrWorker)
+        : (idOrWorker != null ? String(idOrWorker) + "|" : "");
+    let pos = key !== "|" ? _workerPositionMap[key] : null;
+    if (pos == null && idOrWorker != null) {
+        const idStr = typeof idOrWorker === "object" ? String(idOrWorker.id ?? "") : String(idOrWorker);
+        const firstKey = Object.keys(_workerPositionMap).find((k) => k.startsWith(idStr + "|"));
+        if (firstKey) pos = _workerPositionMap[firstKey];
+    }
+
+    if (settingsData && settingsData.groups && pos != null) {
+        const sortedGroups = [...settingsData.groups].sort((a, b) => Number(a.min) - Number(b.min));
+        const group = sortedGroups.find(
+            (g) => pos >= Number(g.min) && pos <= Number(g.max),
         );
-
         if (group) {
-            result.className = `group-${group.code}`; // np. group-d
-            result.name = group.name; // np. SEKCJA D
+            result.className = `group-${group.code}`;
+            result.name = group.name;
             result.code = group.code;
-
-            // Generuje HTML badge'a
             result.badgeHtml = `<span class="group-badge ${result.className}"></span>`;
         }
+    }
+
+    if (!result.name && (pos != null || (idOrWorker != null && String(typeof idOrWorker === "object" ? idOrWorker.id : idOrWorker).trim() !== ""))) {
+        result.name = "Inna";
+        result.className = "group-other";
+        result.badgeHtml = `<span class="group-badge group-other"></span>`;
     }
 
     return result;
@@ -379,7 +444,7 @@ function populateWorkerSelect() {
     workerSelectDropdown.innerHTML = "";
 
     sortedWorkers.forEach((worker) => {
-        const groupInfo = getWorkerGroupInfo(worker.id);
+        const groupInfo = getWorkerGroupInfo(worker);
         const groupBadge = groupInfo.badgeHtml || "";
 
         const option = document.createElement("div");
@@ -466,7 +531,7 @@ function renderIndividualSchedule() {
     const shiftsForMonth = Array.isArray(worker.shifts) ? worker.shifts.slice(0, days.length) : [];
 
     // Use Helper Function for Group Info
-    const groupInfo = getWorkerGroupInfo(worker.id);
+    const groupInfo = getWorkerGroupInfo(worker);
     const groupBadge = groupInfo.badgeHtml || "";
     const groupName = groupInfo.name || "BRAK PRZYDZIAŁU";
 
@@ -693,7 +758,7 @@ function createWorkerCard(worker, shiftCode, dayIndex) {
     else badgeClass += " style-shift-other";
 
     // Dynamic Group Badge
-    const groupInfo = getWorkerGroupInfo(worker.id);
+    const groupInfo = getWorkerGroupInfo(worker);
     const groupBadge = groupInfo.badgeHtml || "";
 
     div.innerHTML = `
@@ -779,7 +844,7 @@ function renderSchedule() {
                 break;
             case "ABSENT":
                 // Special rendering for absent list to match your style
-                const groupInfo = getWorkerGroupInfo(worker.id);
+                const groupInfo = getWorkerGroupInfo(worker);
                 const groupBadge = groupInfo.badgeHtml || "";
 
                 const displayCode = displayShiftCode(shiftCode);
@@ -1112,9 +1177,6 @@ function loadData() {
     const urlScheduleMain = URL_SCHEDULE_MAIN;
     const urlScheduleMaster = URL_SCHEDULE_MASTER;
 
-    const urlSettingsMain = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/refs/heads/main/${GITHUB_SETTINGS_FILE}`;
-    const urlSettingsMaster = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/refs/heads/master/${GITHUB_SETTINGS_FILE}`;
-
     console.log("[SYS] INICJOWANIE PROTOKOŁU POBIERANIA DANYCH..." + (useTestSchedule ? " [parametr ?test]" : "") + " Źródło: mobile-grafik.json (s-pro-v/json-lista)");
 
     const parseJsonResponse = (res, url) => {
@@ -1144,7 +1206,7 @@ function loadData() {
 
     const doFetch = () => Promise.all([
         fetchWithFallback(urlScheduleMain, urlScheduleMaster),
-        fetchWithFallback(urlSettingsMain, urlSettingsMaster).catch((err) => {
+        fetchWithFallback(URL_USTAWIENIA_MAIN, URL_USTAWIENIA_MASTER).catch((err) => {
             console.error(
                 "[SYS] Błąd pobierania ustawień. Używam domyślnych (pustych).",
                 err,
@@ -1153,7 +1215,8 @@ function loadData() {
         }),
     ])
         .then(([schedData, settData]) => {
-            settingsData = settData;
+            settingsData = settData || { groups: [] };
+            normaliseGroups(settingsData);
             // Obsługa JSON: pojedynczy miesiąc { meta, workers } lub wiele miesięcy { months: [ { meta, workers }, ... ] }
             if (schedData && Array.isArray(schedData.months) && schedData.months.length > 0) {
                 scheduleMonths = schedData.months;

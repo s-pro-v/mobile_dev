@@ -5,9 +5,12 @@
  */
 * {
     box-sizing: border-box;
-    border-radius: 0 !important;
     font-family: 'JetBrains Mono', 'Share Tech Mono', Monaco, Courier, monospace;
     user-select: none;
+    scrollbar-width: none;
+    touch-action: manipulation;
+    border-radius: 0 !important;
+    /* STRICT ENFORCEMENT */
 }
 
 body {
@@ -79,9 +82,20 @@ body::before {
     box-shadow: var(--shadow-drop);
 }
 
-.sys-terminal header .theme-override .fas { margin-right: 0; }
-.sys-terminal header .theme-override:hover { background: var(--hover-bg); color: var(--text-color); }
-.sys-terminal header .theme-override:active { background: var(--bg-secondary); color: var(--text-muted); box-shadow: var(--shadow-inset); }
+.sys-terminal header .theme-override .fas {
+    margin-right: 0;
+}
+
+.sys-terminal header .theme-override:hover {
+    background: var(--hover-bg);
+    color: var(--text-color);
+}
+
+.sys-terminal header .theme-override:active {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-inset);
+}
 
 .sys-terminal .auth-core {
     background-color: var(--bg-tertiary);
@@ -90,8 +104,13 @@ body::before {
     box-shadow: var(--shadow-drop);
 }
 
-.sys-terminal .auth-core .hidden { display: none !important; }
-.sys-terminal .auth-core.hidden-step { display: none; }
+.sys-terminal .auth-core .hidden {
+    display: none !important;
+}
+
+.sys-terminal .auth-core.hidden-step {
+    display: none;
+}
 
 .sys-terminal .auth-core h1 {
     font-size: 1.2rem;
@@ -138,7 +157,10 @@ body::before {
     transition: opacity 0.3s;
 }
 
-.sys-terminal .auth-core .token-matrix.typing-active { opacity: 1; pointer-events: auto; }
+.sys-terminal .auth-core .token-matrix.typing-active {
+    opacity: 1;
+    pointer-events: auto;
+}
 
 .sys-terminal .auth-core .token-matrix input {
     width: 100%;
@@ -159,7 +181,9 @@ body::before {
 }
 
 .sys-terminal .auth-core .token-matrix input::-webkit-outer-spin-button,
-.sys-terminal .auth-core .token-matrix input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.sys-terminal .auth-core .token-matrix input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+}
 
 .sys-terminal .auth-core .trigger-btn {
     width: 100%;
@@ -179,11 +203,31 @@ body::before {
     gap: 0.35rem;
 }
 
-.sys-terminal .auth-core .trigger-btn .fas { margin-right: 0.35rem; }
-.sys-terminal .auth-core .trigger-btn:hover:not(:disabled) { background: var(--hover-bg); color: var(--text-color); }
-.sys-terminal .auth-core .trigger-btn:active:not(:disabled) { box-shadow: var(--shadow-inset); }
-.sys-terminal .auth-core .trigger-btn:disabled { background-color: var(--bg-secondary); color: var(--text-muted); cursor: not-allowed; opacity: 0.7; }
-.sys-terminal .auth-core .trigger-btn:active { background-color: var(--bg-secondary); color: var(--text-muted); opacity: 0.7; }
+.sys-terminal .auth-core .trigger-btn .fas {
+    margin-right: 0.35rem;
+}
+
+.sys-terminal .auth-core .trigger-btn:hover:not(:disabled) {
+    background: var(--hover-bg);
+    color: var(--text-color);
+}
+
+.sys-terminal .auth-core .trigger-btn:active:not(:disabled) {
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal .auth-core .trigger-btn:disabled {
+    background-color: var(--bg-secondary);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.sys-terminal .auth-core .trigger-btn:active {
+    background-color: var(--bg-secondary);
+    color: var(--text-muted);
+    opacity: 0.7;
+}
 
 .sys-terminal .auth-core .aux-links {
     margin-top: 1rem;
@@ -192,9 +236,19 @@ body::before {
     justify-content: space-between;
 }
 
-.sys-terminal .auth-core .aux-links a .fas { margin-right: 0.35rem; }
-.sys-terminal .auth-core .aux-links a { color: var(--text-muted); text-decoration: none; font-size: 0.75rem; }
-.sys-terminal .auth-core .aux-links a:hover { color: var(--highlight-color); }
+.sys-terminal .auth-core .aux-links a .fas {
+    margin-right: 0.35rem;
+}
+
+.sys-terminal .auth-core .aux-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.75rem;
+}
+
+.sys-terminal .auth-core .aux-links a:hover {
+    color: var(--highlight-color);
+}
 
 .sys-terminal .auth-core .loader {
     border: 2px dashed var(--highlight-color);
@@ -219,11 +273,99 @@ body::before {
     color: var(--text-muted);
 }
 
-.sys-terminal .status-console.state-success { border-left-color: var(--success-color); color: var(--success-color); }
-.sys-terminal .status-console.state-error { border-left-color: var(--danger-color); color: var(--danger-color); }
-.sys-terminal .status-console.state-warning { border-left-color: var(--highlight-color); color: var(--highlight-color); }
+.sys-terminal .status-console.state-success {
+    border-left-color: var(--success-color);
+    color: var(--success-color);
+}
+
+.sys-terminal .status-console.state-error {
+    border-left-color: var(--danger-color);
+    color: var(--danger-color);
+}
+
+.sys-terminal .status-console.state-warning {
+    border-left-color: var(--highlight-color);
+    color: var(--highlight-color);
+}
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* --- MOBILE (telefon) --- */
+@media (max-width: 600px) {
+    html, body {
+        overflow-x: hidden;
+    }
+
+    body {
+        padding: 0.75rem;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+    }
+
+    .sys-terminal {
+        max-width: 100%;
+        padding: 1rem;
+        margin: 0;
+    }
+
+    .sys-terminal header {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .sys-terminal header .sys-id {
+        font-size: 0.65rem;
+        word-break: break-all;
+    }
+
+    .sys-terminal header .theme-override {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .sys-terminal .auth-core {
+        padding: 0.75rem;
+    }
+
+    .sys-terminal .auth-core h1 {
+        font-size: 1rem;
+    }
+
+    .sys-terminal .auth-core .credential-input {
+        min-height: 44px;
+        font-size: 16px;
+        /* zapobiega auto-zoom na iOS */
+    }
+
+    .sys-terminal .auth-core .token-matrix input {
+        height: 48px;
+        font-size: 1.5rem;
+        min-width: 0;
+    }
+
+    .sys-terminal .auth-core .trigger-btn {
+        min-height: 44px;
+        padding: 0.75rem;
+    }
+
+    .sys-terminal .auth-core .aux-links {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .sys-terminal .status-console {
+        padding: 0.75rem;
+        font-size: 0.8rem;
+        word-break: break-word;
+    }
 }

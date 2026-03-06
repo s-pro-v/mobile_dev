@@ -3,8 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TERMINAL OBSADY v3.1</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>TERMINAL OBSADY v3.2</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap"
         rel="stylesheet">
     <link rel="icon" type="image/svg+xml"
@@ -23,22 +23,29 @@
 
     <!-- Header -->
     <header>
-        <div class="container">
-            <span id="active-key-display-header" class="active-key-display" title="Użyty klucz dostępu"></span>
-            <div class="header-top">
-                <h1 class="header-title uppercase">
-                    <img src="https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/cpu.png" alt="cpu"
-                        class="header-logo">
-                    OBSADA ZMIANY v3.1
-                </h1>
-                <a href="../admin.html" id="link-admin-panel" class="nav-btn log hidden" title="Panel administratora"
-                    style="text-decoration: none; color: inherit;"><i class="fas fa-user-shield"></i></a>
-                <button type="button" class="nav-btn log" id="btn-logout" data-action="open-logout-modal"
-                    title="Wyjdź (panel dostępu)">
-                    <i data-lucide="door-open"></i>
-                </button>
-                <div class="flex items-center gap-2">
-                    <button onclick="toggleTheme()" class="theme-btn" id="theme-btn" title="Zmień motyw">
+        <div class="container header-container">
+            <div class="header-block">
+                <img src="https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/cpu.png" alt="cpu"
+                    class="header-logo">
+                <div class="header-text-col">
+                    <span id="active-key-display-header" class="active-key-display"></span>
+                    <hr class="header-divider">
+                    <h1 class="header-title uppercase">
+                        <span class="header-title-text">OBSADA ZMIANY v3.2</span>
+                        <span id="header-date-display" class="header-date" title="Data aktualizacji grafiku"></span>
+                    </h1>
+                </div>
+                <div class="header-actions">
+                    <a href="../index.html" class="nav-btn log" title="Strona startowa"
+                        style="text-decoration: none; color: inherit;"><i class="fas fa-home"></i></a>
+                    <a href="../admin.html" id="link-admin-panel" class="nav-btn log hidden"
+                        title="Panel administratora" style="text-decoration: none; color: inherit;"><i
+                            class="fas fa-user-shield"></i></a>
+                    <button type="button" class="nav-btn log" id="btn-logout" data-action="open-logout-modal"
+                        title="Wyjdź (panel dostępu)">
+                        <i data-lucide="door-open"></i>
+                    </button>
+                    <button type="button" onclick="toggleTheme()" class="theme-btn" id="theme-btn" title="Zmień motyw">
                         <img src="https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png"
                             alt="theme" id="theme-icon" class="view-icon">
                     </button>

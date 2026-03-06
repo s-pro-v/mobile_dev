@@ -1,23 +1,100 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="pl" theme="dark">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>2FA — SYS.AUTH</title>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="css/hub.css">
 </head>
 
 <body>
-    <h1>2FA — SYS.AUTH</h1>
-    <p class="sub">Logowanie, panel admina, terminal mobilny</p>
-    <nav class="nav">
-        <a href="logowanie.html"><i class="fas fa-sign-in-alt"></i> Logowanie</a>
-        <a href="admin.html"><i class="fas fa-user-shield"></i> Panel admina</a>
-        <a href="mobile/index.html"><i class="fas fa-mobile-alt"></i> Terminal mobilny</a>
-    </nav>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <div class="hub-wrap">
+        <header class="hub-header">
+            <span class="hub-brand">SYS.AUTH</span>
+            <button class="hub-theme-btn" id="theme-btn" type="button" title="Zmiana motywu" aria-label="Motyw">
+                <i class="fas fa-moon" id="theme-icon"></i>
+            </button>
+        </header>
+        <main class="hub-main">
+            <h1 class="hub-title">2FA</h1>
+            <p class="hub-desc">Wybierz panel: logowanie, administracja lub terminal mobilny.</p>
+            <nav class="hub-nav">
+                <a href="logowanie.html" class="hub-card">
+                    <span class="hub-card-icon"><i class="fas fa-right-to-bracket"></i></span>
+                    <span class="hub-card-text">
+                        <span class="hub-card-label">Logowanie</span>
+                        <span class="hub-card-desc">Wejście do systemu 2FA</span>
+                    </span>
+                </a>
+                <a href="admin.html" class="hub-card">
+                    <span class="hub-card-icon"><i class="fas fa-user-shield"></i></span>
+                    <span class="hub-card-text">
+                        <span class="hub-card-label">Panel admina</span>
+                        <span class="hub-card-desc">Zatwierdzanie i sesje</span>
+                    </span>
+                </a>
+                <a href="mobile/index.html" class="hub-card">
+                    <span class="hub-card-icon"><i class="fas fa-mobile-screen"></i></span>
+                    <span class="hub-card-text">
+                        <span class="hub-card-label">Terminal mobilny</span>
+                        <span class="hub-card-desc">Grafik obsady</span>
+                    </span>
+                </a>
+            </nav>
+        </main>
+    </div>
+    <script>
+        (function () {
+            var THEME_KEY = 'sys_hub_theme';
+            var html = document.documentElement;
+            function applyTheme(theme) {
+                var value = theme === 'light' ? 'light' : 'dark';
+                html.setAttribute('theme', value);
+                var icon = document.getElementById('theme-icon');
+                if (icon) icon.className = value === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+                try { localStorage.setItem(THEME_KEY, value); } catch (e) { }
+            }
+            document.getElementById('theme-btn').addEventListener('click', function () {
+                applyTheme(html.getAttribute('theme') === 'dark' ? 'light' : 'dark');
+            });
+            try {
+                var saved = localStorage.getItem(THEME_KEY);
+                if (saved === 'light' || saved === 'dark') applyTheme(saved);
+                else applyTheme(html.getAttribute('theme') || 'dark');
+            } catch (e) { applyTheme('dark'); }
+        })();
+
+
+        // Add these to your existing script section
+        document.addEventListener("DOMContentLoaded", function () {
+            // Remove draggable attribute from all elements
+            document.querySelectorAll('[draggable="true"]').forEach((el) => {
+                el.removeAttribute("draggable");
+            });
+
+            // Prevent dragstart event
+            document.addEventListener("dragstart", function (e) {
+                e.preventDefault();
+                return false;
+            });
+
+            // Prevent drop event
+            document.addEventListener("drop", function (e) {
+                e.preventDefault();
+                return false;
+            });
+
+            // Prevent dragover event
+            document.addEventListener("dragover", function (e) {
+                e.preventDefault();
+                return false;
+            });
+        });
+    </script>
 </body>
 
 </html>

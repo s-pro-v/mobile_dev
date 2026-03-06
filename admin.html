@@ -61,6 +61,24 @@
 
             <section class="dashboard-section">
                 <div class="section-header">
+                    <h2><i class="fas fa-sync-alt" style="color: var(--warning-color);"></i> Tryb aktualizacji</h2>
+                    <div class="section-actions">
+                        <span id="maintenance-status" class="maintenance-status-text">—</span>
+                        <button type="button" id="maintenance-toggle-btn"
+                            title="Włącz/wyłącz tryb aktualizacji (panel mobilny → strona Info)">
+                            <i class="fas fa-toggle-off"></i> <span id="maintenance-btn-label">Włącz</span>
+                        </button>
+                    </div>
+                </div>
+                <p class="section-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    Gdy włączony: użytkownicy otwierający panel mobilny zobaczą stronę
+                    <strong>mobile/aktualizacja.html</strong> (informacja o aktualizacji i dostępie tymczasowo
+                    niedostępnym).
+                </p>
+            </section>
+
+            <section class="dashboard-section">
+                <div class="section-header">
                     <h2><i class="fas fa-sliders" style="color: var(--text-muted);"></i> Ustawienia grup
                         (ustawienia.json)</h2>
                     <div class="section-actions">
@@ -150,6 +168,7 @@
         const STATE_FILE = 'dev/sys_state.json';  // ścieżka do pliku ze stanem 2FA
         const CREDENTIALS_FILE = 'dev/key_f2a.json';  // lista użytkowników (workers), shifts[1]===TRUE = może się zalogować
         const USTAWIENIA_FILE = 'ustawienia.json';  // grupy dla mobile (min, max, code, name)
+        const MAINTENANCE_FILE = 'dev/maintenance.json';  // tryb aktualizacji: { "enabled": true, "active": true } → mobile pokazuje aktualizacja.html
         /** Admin – ten użytkownik ma zawsze dostęp do logowania (nie można wyłączyć). */
         const ADMIN_LOGIN_NAME = 'Roberts';
 
@@ -162,6 +181,8 @@
             auditContainer: document.getElementById('audit-container'),
             usersCanLoginContainer: document.getElementById('users-can-login-container'),
             ustawieniaContainer: document.getElementById('ustawienia-container'),
+            maintenanceStatus: document.getElementById('maintenance-status'),
+            maintenanceBtn: document.getElementById('maintenance-toggle-btn'),
             refreshBtn: document.getElementById('refresh-btn'),
             themeBtn: document.getElementById('theme-btn'),
             status: document.getElementById('status-log'),
@@ -310,6 +331,35 @@
             return { sha: fileData.sha, data: data };
         }
 
+        /** Pobiera dev/maintenance.json – tryb aktualizacji (enabled = true → mobile pokazuje aktualizacja.html). */
+        async function githubGetMaintenance() {
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${MAINTENANCE_FILE}?t=${Date.now()}`;
+            let res;
+            try {
+                res = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+            } catch (e) {
+                throw new Error('Połączenie odrzucone (Failed to fetch).');
+            }
+            if (res.status === 404) return { sha: null, data: { enabled: false, active: false } };
+            if (!res.ok) throw new Error(`API GET Error: ${res.status}`);
+            const fileData = await res.json();
+            const content = fromBase64(fileData.content).trim();
+            let data = { enabled: false, active: false };
+            if (content) {
+                try {
+                    data = JSON.parse(content);
+                    if (data.active == null) data.active = data.enabled === true;
+                    if (data.enabled == null) data.enabled = data.active === true;
+                } catch (e) { }
+            }
+            return { sha: fileData.sha, data: data };
+        }
+
         /**
          * Skanowanie macierzy sys_state
          */
@@ -351,6 +401,7 @@
                 renderAuditLog(data.audit_log || []);
                 fetchAndRenderUsersCanLogin();
                 fetchAndRenderUstawienia();
+                fetchAndRenderMaintenance();
 
                 if (newKeys.length > 0) {
                     await ensureNotificationPermission();
@@ -380,7 +431,7 @@
                 el.innerHTML = `
                     <span class="name">${String(name).toUpperCase()}</span>
                     <div class="session-item-actions">
-                        <span class="time">ostatnia aktywność: ${lastActive}</span>
+                        <span class="time">Last: ${lastActive}</span>
                         <button type="button" class="btn-logout" title="Wyloguj" onclick="processLogout('${key.replace(/'/g, "\\'")}')"><i class="fas fa-right-from-bracket"></i></button>
                     </div>`;
                 DOM.sessionsContainer.appendChild(el);
@@ -498,6 +549,45 @@
             }
         };
 
+        /** Tryb aktualizacji – włączenie pokazuje mobile/aktualizacja.html zamiast grafiku. */
+        let _maintenanceCache = { sha: null, data: { enabled: false, active: false } };
+        async function fetchAndRenderMaintenance() {
+            if (!DOM.maintenanceStatus || !DOM.maintenanceBtn) return;
+            try {
+                const { sha, data } = await githubGetMaintenance();
+                _maintenanceCache = { sha, data: data || { enabled: false, active: false } };
+                const on = _maintenanceCache.data.enabled === true || _maintenanceCache.data.active === true;
+                DOM.maintenanceStatus.textContent = on ? 'Włączony (mobile → aktualizacja.html)' : 'Wyłączony';
+                DOM.maintenanceStatus.style.color = on ? 'var(--warning-color)' : 'var(--text-muted)';
+                const labelEl = document.getElementById('maintenance-btn-label');
+                const iconEl = DOM.maintenanceBtn.querySelector('i');
+                if (labelEl) labelEl.textContent = on ? 'Wyłącz' : 'Włącz';
+                if (iconEl) {
+                    iconEl.className = on ? 'fas fa-toggle-on' : 'fas fa-toggle-off';
+                }
+                DOM.maintenanceBtn.onclick = processToggleMaintenance;
+            } catch (e) {
+                DOM.maintenanceStatus.textContent = 'Błąd odczytu';
+                DOM.maintenanceStatus.style.color = 'var(--danger-color)';
+            }
+        }
+        window.processToggleMaintenance = async function () {
+            if (!getToken()) {
+                updateLog('[KRYTYCZNE] Ustaw token, aby przełączyć tryb aktualizacji.', 'error');
+                return;
+            }
+            const newEnabled = !(_maintenanceCache.data && (_maintenanceCache.data.enabled === true || _maintenanceCache.data.active === true));
+            const payload = { enabled: newEnabled, active: newEnabled };
+            updateLog('[SYSTEM] Tryb aktualizacji → ' + (newEnabled ? 'WŁĄCZONY' : 'WYŁĄCZONY') + '...', 'warning');
+            try {
+                await githubPutFile(MAINTENANCE_FILE, payload, _maintenanceCache.sha, '[SYS.ADMIN] Tryb aktualizacji: ' + (newEnabled ? 'włączony' : 'wyłączony'));
+                updateLog('[SUKCES] Panel mobilny ' + (newEnabled ? 'pokazuje stronę aktualizacja.' : 'działa normalnie.') + '', 'success');
+                fetchAndRenderMaintenance();
+            } catch (err) {
+                updateLog('[BŁĄD] ' + err.message, 'error');
+            }
+        };
+
         /** Lista użytkowników uprawnionych do logowania (z key_f2a.json). */
         let _credentialsCache = { sha: null, data: null };
         async function fetchAndRenderUsersCanLogin() {
@@ -538,7 +628,7 @@
                     <span class="user-login-badge ${canLogin ? 'badge-true' : 'badge-false'}">${escapeHtml(badgeLabel)}</span>
                     ${noToggle ? '<span class="user-login-hint">(admin)</span>' : `<button type="button" class="btn-toggle-login" data-index="${index}" title="Przełącz dostęp">${canLogin ? 'Wyłącz' : 'Włącz'}</button>`}
                     <span class="user-login-badge ${skip2fa ? 'badge-skip2fa' : 'badge-false'}">${escapeHtml(skip2faLabel)}</span>
-                    <span class="user-login-hint" style="min-width: 6rem;">Bez potwierdzenia</span>
+                    <span class="user-login-hint" style="min-width: 6rem;">Bez 2FA</span>
                     ${noToggle ? '<span class="user-login-hint">—</span>' : `<button type="button" class="btn-toggle-skip2fa" data-index="${index}" title="Przełącz logowanie bez potwierdzenia">${skip2fa ? 'Wyłącz' : 'Włącz'}</button>`}
                 `;
                 const btn = row.querySelector('.btn-toggle-login');

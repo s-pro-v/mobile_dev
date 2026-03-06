@@ -51,6 +51,8 @@ const GITHUB_PAT_STORAGE = "sys_auth_github_pat";
 const ADMIN_DISPLAY_NAME = (function () { try { return atob("Um9iZXJ0cw=="); } catch (e) { return ""; } })();
 /** localStorage: ostatni znany meta.generated z JSON grafiku (GitHub) – do wykrywania nowej aktualizacji. */
 const SCHEDULE_GENERATED_STORAGE = "app-schedule-generated";
+/** Tryb aktualizacji (admin): gdy enabled === true, przekieruj na aktualizacja.html. Gałąź "main" (raw GitHub). */
+const URL_MAINTENANCE = "https://raw.githubusercontent.com/" + GITHUB_USER + "/" + GITHUB_REPO + "/main/dev/maintenance.json";
 
 /** Etykieta w nagłówku: data z JSON (mobile-grafik.json date). */
 let headerUpdateLabel = "Aktualizacja";
@@ -1399,6 +1401,31 @@ whenReady(function () {
         return;
     }
 
+    /* Tryb aktualizacji (ustawiony w panelu admin): przekieruj na aktualizacja.html. Dla admina nie stosować. */
+    function checkMaintenanceAndRedirect(cbIfOk) {
+        fetch(URL_MAINTENANCE + "?t=" + Date.now())
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+                if (d && (d.enabled === true || d.active === true)) {
+                    var userName = "";
+                    try { userName = (localStorage.getItem(SYS_AUTH_2FA_STORAGE) || "").trim(); } catch (e) { }
+                    var admin = (ADMIN_DISPLAY_NAME || "").trim().toLowerCase();
+                    if (admin && userName.toLowerCase() === admin) {
+                        if (typeof cbIfOk === "function") cbIfOk();
+                        return;
+                    }
+                    window.location.replace("aktualizacja.html");
+                    return;
+                }
+                if (typeof cbIfOk === "function") cbIfOk();
+            })
+            .catch(function () { if (typeof cbIfOk === "function") cbIfOk(); });
+    }
+    window._checkMaintenanceAndRedirect = checkMaintenanceAndRedirect;
+    checkMaintenanceAndRedirect(runMobileInit);
+});
+
+function runMobileInit() {
     initTheme();
     /* Panel admina tylko dla Robertsa. */
     (function () {
@@ -1442,9 +1469,11 @@ whenReady(function () {
     if (individualMonthPrev) individualMonthPrev.addEventListener("click", function () { changeMonth(-1); lucide.createIcons(); });
     if (individualMonthNext) individualMonthNext.addEventListener("click", function () { changeMonth(1); lucide.createIcons(); });
 
-    /** Po powrocie do zakładki: sprawdź, czy nadal jest dostęp; potem ustaw dzisiejszy dzień. */
+    /** Po powrocie do zakładki: sprawdź dostęp i tryb aktualizacji; potem ustaw dzisiejszy dzień. */
     document.addEventListener("visibilitychange", function () {
         if (document.visibilityState !== "visible") return;
+        if (typeof window._checkMaintenanceAndRedirect === "function")
+            window._checkMaintenanceAndRedirect();
         checkAccessStillValid();
         if (scheduleMonths.length > 0) {
             goToToday();
@@ -1452,9 +1481,13 @@ whenReady(function () {
         }
     });
 
-    /** Okresowa weryfikacja dostępu (co 60 s). */
+    /** Okresowa weryfikacja dostępu i trybu aktualizacji (co 60 s). */
     setInterval(checkAccessStillValid, 60 * 1000);
-});
+    setInterval(function () {
+        if (typeof window._checkMaintenanceAndRedirect === "function")
+            window._checkMaintenanceAndRedirect();
+    }, 60 * 1000);
+}
 
 whenReady(function () {
     // Remove draggable attribute from all elements

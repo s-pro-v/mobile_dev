@@ -2496,3 +2496,93 @@ i {
     background: var(--bg-tertiary);
     color: var(--text-muted);
 }
+
+/* --- STRONA INFO / AKTUALIZACJA (mobile/aktualizacja.html) --- */
+body.info-page {
+    min-height: 100vh;
+    padding: 0.5rem 0;
+}
+
+.info-container {
+    padding: 0 0.75rem;
+    max-width: 28rem;
+    margin: 0 auto;
+}
+
+.info-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    background-color: var(--bg-tertiary);
+    background-image: var(--bg-stripe-pattern);
+    background-size: var(--bg-stripe-size);
+    padding: 0.5rem 0.75rem;
+    box-shadow: var(--shadow-inset);
+}
+
+.info-title {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--text-muted);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.info-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.info-card {
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-drop);
+    padding: 1rem 1.25rem;
+    border-radius: 0;
+}
+
+.info-card-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+}
+
+.info-card-update .info-card-icon {
+    color: var(--highlight-color);
+}
+
+.info-card-unavailable .info-card-icon {
+    color: var(--warning-color);
+}
+
+.info-card-title {
+    font-size: 0.85rem;
+    font-weight: bold;
+    margin: 0 0 0.35rem 0;
+    color: var(--text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.info-card-desc {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    margin: 0;
+    color: var(--text-muted);
+}
+
+.info-footer {
+    margin-top: 1.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+}

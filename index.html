@@ -12,6 +12,20 @@
 </head>
 
 <body>
+    <script>
+        (function () {
+            var SYS_AUTH_2FA_STORAGE = "sys_auth_2fa_mobile";
+            var ADMIN_DISPLAY_NAME = (function () { try { return atob("Um9iZXJ0cw=="); } catch (e) { return ""; } })();
+            try {
+                var userName = (localStorage.getItem(SYS_AUTH_2FA_STORAGE) || "").trim();
+                if (userName) {
+                    var admin = (ADMIN_DISPLAY_NAME || "").trim().toLowerCase();
+                    if (!admin || userName.toLowerCase() !== admin)
+                        window.location.replace("mobile/index.html");
+                }
+            } catch (e) { }
+        })();
+    </script>
     <div class="hub-wrap">
         <header class="hub-header">
             <span class="hub-brand">SYS.AUTH</span>

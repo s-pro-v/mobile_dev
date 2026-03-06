@@ -10,6 +10,7 @@
     scrollbar-width: none;
     touch-action: manipulation;
     border-radius: 0 !important;
+    outline: none;
     /* STRICT ENFORCEMENT */
 }
 
@@ -170,12 +171,19 @@ body::before {
 .sys-terminal .dashboard .audit-log {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.2rem;
     font-size: 0.85rem;
-    max-height: 180px;
+    max-height: 250px;
     overflow-y: auto;
-    padding: 0.5rem;
+    padding: 0.2rem;
     box-shadow: var(--shadow-inset);
+}
+
+.sys-terminal .dashboard #users-can-login-container {
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 250px;
+    min-height: 200px;
 }
 
 .sys-terminal .dashboard .ustawienia-table-wrap {
@@ -285,7 +293,13 @@ body::before {
 
 .sys-terminal .dashboard .section-actions {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
+}
+
+.sys-terminal .dashboard .maintenance-status-text {
+    font-size: 0.75rem;
+    margin-right: 0.5rem;
     margin-left: auto;
 }
 
@@ -455,9 +469,71 @@ body::before {
 }
 
 .sys-terminal .dashboard .user-login-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto auto;
+    gap: 0.4rem 1rem;
+    padding: 0.5rem 0.75rem;
     align-items: center;
-    gap: 0.75rem;
+}
+
+.sys-terminal .dashboard .user-login-row .name {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    padding-bottom: 0.35rem;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sys-terminal .dashboard .user-login-row>*:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+}
+
+.sys-terminal .dashboard .user-login-row>*:nth-child(2)::before {
+    content: "Dostęp";
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.sys-terminal .dashboard .user-login-row>*:nth-child(3) {
+    grid-column: 1;
+    grid-row: 4;
+}
+
+.sys-terminal .dashboard .user-login-row>*:nth-child(4) {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+}
+
+.sys-terminal .dashboard .user-login-row>*:nth-child(4)::before {
+    content: "2fa";
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.sys-terminal .dashboard .user-login-row>*:nth-child(5) {
+    grid-column: 2;
+    grid-row: 3;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.sys-terminal .dashboard .user-login-row>*:nth-child(6) {
+    grid-column: 2;
+    grid-row: 4;
 }
 
 .sys-terminal .dashboard .user-login-badge {
@@ -486,9 +562,8 @@ body::before {
     border: 1px solid var(--info-color);
 }
 
-.sys-terminal .dashboard .btn-toggle-login,
-.sys-terminal .dashboard .btn-toggle-skip2fa {
-    margin-left: auto;
+.sys-terminal .dashboard .user-login-row .btn-toggle-login,
+.sys-terminal .dashboard .user-login-row .btn-toggle-skip2fa {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
     background: var(--bg-tertiary);
@@ -504,8 +579,7 @@ body::before {
     background: var(--hover-bg);
 }
 
-.sys-terminal .dashboard .user-login-hint {
-    margin-left: auto;
+.sys-terminal .dashboard .user-login-row .user-login-hint {
     font-size: 0.75rem;
     color: var(--text-muted);
 }
@@ -593,7 +667,15 @@ body::before {
 
     .sys-terminal .dashboard .session-list,
     .sys-terminal .dashboard .audit-log {
-        max-height: 160px;
+        max-height: 260px;
+
+    }
+
+    .sys-terminal .dashboard #users-can-login-container {
+        max-height: 50vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
     }
 
     .sys-terminal .dashboard .request-list .request-card {
@@ -607,9 +689,107 @@ body::before {
         justify-content: flex-end;
     }
 
+    .sys-terminal .dashboard .user-login-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto auto auto;
+        gap: 0.4rem 0.75rem;
+        padding: 0.5rem 0.6rem;
+        align-items: center;
+    }
+
+    .sys-terminal .dashboard .user-login-row .name {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        margin-bottom: 0;
+        padding-bottom: 0.35rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+
+    .sys-terminal .dashboard .user-login-row>*:nth-child(2) {
+        grid-column: 1;
+        grid-row: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .sys-terminal .dashboard .user-login-row>*:nth-child(2)::before {
+        content: "Dostęp";
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+    }
+
+    .sys-terminal .dashboard .user-login-row>*:nth-child(3) {
+        grid-column: 1;
+        grid-row: 4;
+    }
+
+    .sys-terminal .dashboard .user-login-row>*:nth-child(4) {
+        grid-column: 2;
+        grid-row: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .sys-terminal .dashboard .user-login-row>*:nth-child(4)::before {
+        content: "2fa";
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+    }
+
+    .sys-terminal .dashboard .user-login-row>*:nth-child(5) {
+        grid-column: 2;
+        grid-row: 3;
+        font-size: 0.65rem;
+        color: var(--text-muted);
+    }
+
+    .sys-terminal .dashboard .user-login-row>*:nth-child(6) {
+        grid-column: 2;
+        grid-row: 4;
+    }
+
+    .sys-terminal .dashboard .user-login-row .user-login-hint,
+    .sys-terminal .dashboard .user-login-row .btn-toggle-login,
+    .sys-terminal .dashboard .user-login-row .btn-toggle-skip2fa {
+        margin-left: 0;
+    }
+
+    .sys-terminal .dashboard .user-login-row .user-login-badge {
+        min-width: 2.5rem;
+        font-size: 0.7rem;
+        padding: 0.2rem 0.35rem;
+    }
+
+    .sys-terminal .dashboard .user-login-row .btn-toggle-login,
+    .sys-terminal .dashboard .user-login-row .btn-toggle-skip2fa {
+        padding: 0.35rem 0.5rem;
+        font-size: 0.7rem;
+    }
+
     .sys-terminal .status-console {
         padding: 0.75rem;
         font-size: 0.8rem;
         word-break: break-word;
+    }
+}
+
+
+@media (max-width: 400px) {
+    .sys-terminal .dashboard .user-login-row {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto;
+        gap: 0.4rem 0.75rem;
+        padding: 0.5rem 0.6rem;
+        align-items: center;
     }
 }

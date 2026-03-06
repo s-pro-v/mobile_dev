@@ -170,7 +170,7 @@
         const USTAWIENIA_FILE = 'ustawienia.json';  // grupy dla mobile (min, max, code, name)
         const MAINTENANCE_FILE = 'dev/maintenance.json';  // tryb aktualizacji: { "enabled": true, "active": true } → mobile pokazuje aktualizacja.html
         /** Admin – ten użytkownik ma zawsze dostęp do logowania (nie można wyłączyć). */
-        const ADMIN_LOGIN_NAME = 'Roberts';
+        const ADMIN_LOGIN_NAME = (function () { try { return atob('Um9iZXJ0cw=='); } catch (e) { return ''; } })();
 
         let _lastPendingKeys = []; // Do wykrywania nowych żądań (powiadomienia)
         let _lastSessionKeys = []; // Poprzednie klucze active_sessions – do wykrywania wylogowań

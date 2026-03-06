@@ -92,9 +92,32 @@ function checkAccessStillValid() {
             var sessions = data.active_sessions;
             if (!sessions || typeof sessions !== "object") sessions = {};
             var session = sessions[userKey];
+            
+            // Bypass wylogowania dla administratora
+            var admin = (ADMIN_DISPLAY_NAME || "").trim().toLowerCase();
+            if (admin && userKey === admin) {
+                 window._isLoggedOutByAdmin = false;
+                 updateHeaderActiveKey();
+                 return;
+            }
+
             if (!session || typeof session !== "object") {
+                // Zapobiegaj natychmiastowemu wylogowaniu przez cache Github Raw (5 min)
+                try {
+                    var loginTime = parseInt(localStorage.getItem("sys_auth_login_time"), 10);
+                    if (!isNaN(loginTime) && Date.now() - loginTime < 5 * 60 * 1000) {
+                        return; // Pomiń wylogowanie - stan serwera może być nieświeży 
+                    }
+                } catch (e) { }
+
                 try { localStorage.removeItem(SYS_AUTH_2FA_STORAGE); } catch (e) { }
-                window.location.href = LOGIN_PAGE_URL + "?return=mobile";
+                window._isLoggedOutByAdmin = true;
+                updateHeaderActiveKey();
+                // Nie przekierowujemy natychmiast, żeby użytkownik zobaczył status "Wylogowany"
+            } else {
+                window._isLoggedOutByAdmin = false;
+                updateHeaderActiveKey();
+                window.location.href = LOGIN_PAGE_URL + "  ";
             }
         })
         .catch(function () { });
@@ -107,9 +130,17 @@ function updateHeaderActiveKey() {
         try {
             let label = "";
             try {
-                const userName = localStorage.getItem(SYS_AUTH_2FA_STORAGE);
+                // Utrzymaj imię nawet po wylogowaniu do wyświetlenia
+                let userName = localStorage.getItem(SYS_AUTH_2FA_STORAGE);
+                if (!userName && window._lastKnownUserName) userName = window._lastKnownUserName;
+
                 if (userName && userName.trim()) {
-                    label = "Zalogowany: " + escapeHtml(first3Letters(userName));
+                    window._lastKnownUserName = userName;
+                    let badge = window._isLoggedOutByAdmin
+                        ? "<span style='color: var(--danger-color, #dc3545); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 4px; background: rgba(220, 53, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Wylogowany</span>"
+                        : "<span style='color: var(--success-color, #28a745); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 4px; background: rgba(40, 167, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Aktywny</span>";
+
+                    label = "Zalogowany: " + escapeHtml(first3Letters(userName)) + badge;
                 }
             } catch (e) { }
             el.innerHTML = "<i data-lucide=\"refresh-cw\" class=\"update-icon-inline\" aria-hidden=\"true\"></i> " + label;
@@ -1427,6 +1458,7 @@ whenReady(function () {
 
 function runMobileInit() {
     initTheme();
+    checkAccessStillValid();
     /* Panel admina tylko dla Robertsa. */
     (function () {
         var el = document.getElementById("link-admin-panel");
@@ -1481,8 +1513,8 @@ function runMobileInit() {
         }
     });
 
-    /** Okresowa weryfikacja dostępu i trybu aktualizacji (co 60 s). */
-    setInterval(checkAccessStillValid, 60 * 1000);
+    /** Okresowa weryfikacja dostępu i trybu aktualizacji (co 20 s). */
+    setInterval(checkAccessStillValid, 20 * 1000);
     setInterval(function () {
         if (typeof window._checkMaintenanceAndRedirect === "function")
             window._checkMaintenanceAndRedirect();

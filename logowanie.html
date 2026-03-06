@@ -60,6 +60,21 @@
         <div class="status-console" id="status-log">[SYSTEM] Oczekiwanie na definicję klucza API...</div>
     </div>
 
+    <!-- PRE-CHECK: Automatyczne logowanie Admina -->
+    <script>
+        (function() {
+            var admin = (function () { try { return atob('Um9iZXJ0cw=='); } catch (e) { return ''; } })(); // Roberts
+            if (!admin) return;
+            try {
+                var storedUser = localStorage.getItem('sys_auth_2fa_mobile');
+                if (storedUser && storedUser.trim().toLowerCase() === admin.toLowerCase()) {
+                    // Od razu przekieruj na mobile panel
+                    window.location.replace("mobile/index.html");
+                }
+            } catch(e) {}
+        })();
+    </script>
+
     <script>
         /**
          * Klucz API GitHub – pobierany z auth.json (XOR), fallback: localStorage.
@@ -104,7 +119,7 @@
         const REPO_NAME = 'json-lista';
         const CREDENTIALS_FILE = 'dev/key_f2a.json';
         const STATE_FILE = 'dev/sys_state.json';  // ten sam plik co w admin – żądania muszą trafiać do jednego pliku
-        const GLOBAL_PASS = 'start26'; // W produkcji: weryfikacja po stronie serwera
+        const GLOBAL_PASS = (function () { try { return atob('c3RhcnQyNg=='); } catch (e) { return ''; } })(); // W produkcji: weryfikacja po stronie serwera
         const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
         /** Admin – ten użytkownik ma zawsze dostęp do logowania (zgodnie z admin.html). Zakodowane. */
         const ADMIN_LOGIN_NAME = (function () { try { return atob('Um9iZXJ0cw=='); } catch (e) { return ''; } })();
@@ -295,7 +310,10 @@
                     data.audit_log.unshift(`[${ts}] AUTH_SUCCESS: Zalogowano (bez potwierdzenia) -> ${node.name}`);
                     if (data.audit_log.length > 100) data.audit_log.pop();
                     await githubPutFile(STATE_FILE, data, sha, `[SYS.AUTH] Logowanie bez potwierdzenia: ${node.name}`);
-                    try { localStorage.setItem('sys_auth_2fa_mobile', node.name); } catch (e) { }
+                    try { 
+                        localStorage.setItem('sys_auth_2fa_mobile', node.name);
+                        localStorage.setItem('sys_auth_login_time', Date.now());
+                    } catch (e) { }
                     updateLog(`[SUKCES] Zalogowano (bez potwierdzenia): ${node.name}. Przekierowanie...`, 'success');
                     window.location.href = 'mobile/index.html';
                     return;
@@ -406,7 +424,10 @@
 
                 await githubPutFile(STATE_FILE, data, sha, `[SYS.AUTH] Finalizacja logowania: ${ACTIVE_USER.name}`);
 
-                try { localStorage.setItem('sys_auth_2fa_mobile', ACTIVE_USER.name); } catch (e) { }
+                try { 
+                    localStorage.setItem('sys_auth_2fa_mobile', ACTIVE_USER.name);
+                    localStorage.setItem('sys_auth_login_time', Date.now()); 
+                } catch (e) { }
                 const linkMobile = document.getElementById('link-mobile-panel');
                 if (linkMobile) { linkMobile.classList.remove('hidden'); }
 
@@ -455,7 +476,10 @@
             } catch (err) {
                 console.error(err);
             } finally {
-                try { localStorage.removeItem('sys_auth_2fa_mobile'); } catch (e) { }
+                try { 
+                    localStorage.removeItem('sys_auth_2fa_mobile');
+                    localStorage.removeItem('sys_auth_login_time'); 
+                } catch (e) { }
                 location.reload();
             }
         }

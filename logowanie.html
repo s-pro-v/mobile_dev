@@ -559,13 +559,7 @@
         // Autostart: załaduj klucz API (auth.json XOR lub localStorage), potem credentials
         loadPat().then(function () { initCredentials(); }).catch(function (e) { updateLog('[BŁĄD] ' + (e.message || e), 'error'); });
 
-        // Brak możliwości cofania (przycisk Wstecz)
-        (function () {
-            if (typeof history === 'undefined' || !history.pushState) return;
-            history.pushState(null, '', location.href);
-            window.addEventListener('popstate', function () { history.pushState(null, '', location.href); });
-        })();
-    </script>
+         </script>
 </body>
 
 </html>

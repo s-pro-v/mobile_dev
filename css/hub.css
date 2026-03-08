@@ -234,4 +234,15 @@ body::before {
     .hub-card-desc {
         display: none;
     }
+
+    .hub-nav {
+        padding: 0.3rem;
+        box-shadow: var(--shadow-inset);
+        background: var(--bg-color);
+        outline: 1px solid var(--border-color);
+        outline-offset: -1px;
+        outline-width: 4px;
+    }
+
+
 }

@@ -624,15 +624,14 @@
                 const skip2fa = shifts[3] === 'TRUE' || shifts[3] === true;
                 const row = document.createElement('div');
                 row.className = 'session-item user-login-row';
-                const badgeLabel = canLogin ? (isAdmin ? 'TRUE (admin)' : 'TRUE') : 'FALSE';
+                const badgeLabel = canLogin ? (isAdmin ? '(Adm)' : 'TRUE') : 'FALSE';
                 const noToggle = isAdmin;
                 const skip2faLabel = skip2fa ? 'TRUE' : 'FALSE';
                 row.innerHTML = `
                     <span class="name">${escapeHtml(name)}</span>
                     <span class="user-login-badge ${canLogin ? 'badge-true' : 'badge-false'}">${escapeHtml(badgeLabel)}</span>
-                    ${noToggle ? '<span class="user-login-hint">(admin)</span>' : `<button type="button" class="btn-toggle-login" data-index="${index}" title="Przełącz dostęp">${canLogin ? 'Wyłącz' : 'Włącz'}</button>`}
+                    ${noToggle ? '<span class="user-login-hint"></span>' : `<button type="button" class="btn-toggle-login" data-index="${index}" title="Przełącz dostęp">${canLogin ? 'Wyłącz' : 'Włącz'}</button>`}
                     <span class="user-login-badge ${skip2fa ? 'badge-skip2fa' : 'badge-false'}">${escapeHtml(skip2faLabel)}</span>
-                    <span class="user-login-hint" style="min-width: 6rem;">Bez 2FA</span>
                     ${noToggle ? '<span class="user-login-hint">—</span>' : `<button type="button" class="btn-toggle-skip2fa" data-index="${index}" title="Przełącz logowanie bez potwierdzenia">${skip2fa ? 'Wyłącz' : 'Włącz'}</button>`}
                 `;
                 const btn = row.querySelector('.btn-toggle-login');

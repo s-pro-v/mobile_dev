@@ -110,6 +110,20 @@
                 return false;
             });
         });
+const session = require('express-session');
+
+app.use(session({
+  secret: 'your_secret_key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    secure: true,      // Wymagane dla SameSite=None
+    sameSite: 'none',  // Rozwiązuje problem wylogowywania w Chrome Mobile
+    httpOnly: true,    // Blokuje dostęp JS do ciasteczka (bezpieczeństwo)
+    maxAge: 24 * 60 * 60 * 1000 // Czas trwania sesji (np. 1 dzień)
+  }
+}));
+
     </script>
 </body>
 

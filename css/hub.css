@@ -245,19 +245,16 @@ body::before {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--highlight-bg);
     color: var(--highlight-color);
     font-size: 1.1rem;
 }
 
 .hub-card:hover .hub-card-icon {
-    background: rgba(var(--rgba-highlight), 0.2);
     color: var(--highlight-color);
 }
 
 .hub-card:active .hub-card-icon {
     color: var(--text-muted);
-    background: var(--bg-tertiary);
 }
 
 .hub-card-label {
@@ -327,3 +324,4 @@ body::before {
 
 
 }
+

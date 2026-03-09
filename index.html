@@ -62,6 +62,9 @@
                 </a>
             </nav>
         </main>
+        <footer class="hub-footer">
+            <img src="qr-code.png" alt="QR Code" class="hub-qr-code">
+        </footer>
     </div>
     <script>
         (function () {
@@ -110,20 +113,43 @@
                 return false;
             });
         });
-const session = require('express-session');
 
-app.use(session({
-  secret: 'your_secret_key',
-  resave: false,
-  saveUninitialized: true,
-  cookie: {
-    secure: true,      // Wymagane dla SameSite=None
-    sameSite: 'none',  // Rozwiązuje problem wylogowywania w Chrome Mobile
-    httpOnly: true,    // Blokuje dostęp JS do ciasteczka (bezpieczeństwo)
-    maxAge: 24 * 60 * 60 * 1000 // Czas trwania sesji (np. 1 dzień)
-  }
-}));
+        // Ukryj hub-footer, dodaj przycisk "Dodaj" pod .hub-main, ale z opcją pokaz/ukryj footeru
+        document.addEventListener("DOMContentLoaded", function () {
+            var hubFooter = document.querySelector('.hub-footer');
+            var hubMain = document.querySelector('.hub-main');
 
+            if (hubMain && hubMain.parentNode) {
+                var dodajBtn = document.createElement('button');
+                dodajBtn.textContent = '+';
+                dodajBtn.className = 'hub-dodaj-btn';
+                dodajBtn.style.display = 'block';
+                dodajBtn.style.margin = "2rem auto 0 auto";
+                dodajBtn.style.padding = "0.5rem 1rem";
+                dodajBtn.style.fontSize = "1.1rem";
+                dodajBtn.style.fontWeight = "700";
+                dodajBtn.style.background = "var(--bg-tertiary)";
+                dodajBtn.style.color = "var(--text-color)";
+                dodajBtn.style.border = "1px solid var(--border-color)";
+                dodajBtn.style.boxShadow = "var(--shadow-drop)";
+                dodajBtn.style.borderRadius = "7px";
+                dodajBtn.style.cursor = "pointer";
+                hubMain.parentNode.insertBefore(dodajBtn, hubMain.nextSibling);
+
+                // Start with footer hidden
+                if (hubFooter) {
+                    hubFooter.style.display = "none";
+                }
+
+                dodajBtn.addEventListener('click', function () {
+                    if (hubFooter) {
+                        var isHidden = hubFooter.style.display === "none";
+                        hubFooter.style.display = isHidden ? "" : "none";
+                        dodajBtn.textContent = isHidden ? "-" : "+";
+                    }
+                });
+            }
+        });
     </script>
 </body>
 

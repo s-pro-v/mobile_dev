@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="css/logowanie.css">
 </head>
 
+
 <body>
 
     <div class="sys-terminal">
@@ -249,7 +250,9 @@
             const key = ACTIVE_USER.name.toLowerCase();
             
             if (data.access_permissions) delete data.access_permissions[key];
+            // POPRAWKA: Bezwzględne czyszczenie cache z pending_2fa
             if (data.pending_2fa) delete data.pending_2fa[key];
+            
             data.active_sessions[key] = { original_name: ACTIVE_USER.name, last_active: Date.now() };
             
             const ok = await ghPut(STATE_FILE, data, sha, `[AUTH] Finalize: ${ACTIVE_USER.name}`);
@@ -260,7 +263,12 @@
             localStorage.setItem('sys_auth_2fa_mobile', name);
             localStorage.setItem('sys_auth_login_time', Date.now());
             updateLog('[SUKCES] Sesja aktywna. Przekierowanie...', 'success');
-            setTimeout(() => window.location.href = 'mobile/index.html', 800);
+            
+            // POPRAWKA: Opóźnienie przekierowania (1 sekunda) 
+            // daje to czas dla serwerów GitHub na spropagowanie najnowszych zmian w cache.
+            setTimeout(() => {
+                window.location.href = 'mobile/index.html';
+            }, 1000);
         }
 
         /** LISTENERY ZDARZEŃ */

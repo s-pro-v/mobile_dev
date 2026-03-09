@@ -61,23 +61,23 @@
         <div class="status-console" id="status-log">[SYSTEM] Booting...</div>
     </div>
 
-    <script>
-        /** KONFIGURACJA GITHUB */
+<script>
+        /** KONFIGURACJA I DEKODOWANIE */
+        const AUTH_JSON_URL = 'https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/dev/auth.json';
+        const XOR_KEY = atob('dzVn');
+        const ADMIN_NAME = atob('Um9iZXJ0cw=='); // Roberts
+        const ADMIN_PASS = atob('YWRtaW4yNg=='); // admin26
+        const GLOBAL_PASS = atob('c3RhcnQyNg=='); // start26
+        
         const REPO_OWNER = 's-pro-v';
         const REPO_NAME = 'json-lista';
         const STATE_FILE = 'dev/sys_state.json';
         const CREDENTIALS_FILE = 'dev/key_f2a.json';
-        const AUTH_JSON_URL = 'https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/dev/auth.json';
-        const XOR_KEY = atob('dzVn'); 
-        
-        const ADMIN_NAME = atob('Um9iZXJ0cw=='); // Roberts
-        const ADMIN_PASS = atob('YWRtaW4yNg=='); // admin26
-        const GLOBAL_PASS = atob('c3RhcnQyNg=='); // start26
 
         let GITHUB_PAT = null;
-        let ACTIVE_USER_DATA = null;
-        let POLLING_TIMER = null;
         let IDENTITY_MATRIX = {};
+        let ACTIVE_USER = null;
+        let POLLING_INTERVAL = null;
 
         const DOM = {
             step1: document.getElementById('step-1'),
@@ -87,51 +87,36 @@
             loginBtn: document.getElementById('login-trigger'),
             authBtn: document.getElementById('auth-trigger'),
             userDisp: document.getElementById('current-user-display'),
+            inputs: document.querySelectorAll('.crypt-input'),
             status: document.getElementById('status-log'),
             themeBtn: document.getElementById('theme-btn'),
             cancelBtn: document.getElementById('cancel-trigger'),
-            inputs2fa: document.querySelectorAll('.crypt-input'),
             adminLink: document.getElementById('link-admin-panel')
         };
 
         function updateLog(msg, state = 'default') {
             DOM.status.textContent = msg;
             DOM.status.className = 'status-console';
-            if(state !== 'default') DOM.status.classList.add(`state-${state}`);
+            if (state !== 'default') DOM.status.classList.add(`state-${state}`);
         }
 
-        /** DEKODOWANIE PAT */
-        function xorDecode(base64, key) {
-            const binary = atob(base64);
+        function xorDecode(enc, key) {
+            const bin = atob(enc);
             let out = '';
-            for (let i = 0; i < binary.length; i++) {
-                out += String.fromCharCode(binary.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            for (let i = 0; i < bin.length; i++) {
+                out += String.fromCharCode(bin.charCodeAt(i) ^ key.charCodeAt(i % key.length));
             }
             return out;
-        }
-
-        async function loadPat() {
-            try {
-                const stored = localStorage.getItem('sys_auth_github_pat');
-                if (stored) { GITHUB_PAT = stored; return; }
-
-                const res = await fetch(`${AUTH_JSON_URL}?t=${Date.now()}`);
-                const data = await res.json();
-                const enc = (Array.isArray(data) ? data[0] : data).sys_pat;
-                GITHUB_PAT = xorDecode(enc, XOR_KEY);
-            } catch (e) {
-                updateLog('Błąd krytyczny: Brak klucza API.', 'error');
-            }
         }
 
         /** GITHUB API */
         async function ghGet(path) {
             const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?t=${Date.now()}`, {
-                headers: { 'Authorization': `token ${GITHUB_PAT}` }
+                headers: { 'Authorization': `token ${GITHUB_PAT}`, 'Accept': 'application/vnd.github.v3+json' }
             });
-            if (!res.ok) return { sha: null, data: {} };
-            const file = await res.json();
-            return { sha: file.sha, data: JSON.parse(decodeURIComponent(escape(atob(file.content)))) };
+            if (!res.ok) return { sha: null, data: { active_sessions: {}, pending_2fa: {}, access_permissions: {}, audit_log: [] } };
+            const json = await res.json();
+            return { sha: json.sha, data: JSON.parse(decodeURIComponent(escape(atob(json.content)))) };
         }
 
         async function ghPut(path, data, sha, msg) {
@@ -143,152 +128,165 @@
             return res.ok;
         }
 
-        /** LOGIKA AUTORYZACJI */
+        /** INICJALIZACJA SYSTEMU */
         async function init() {
-            await loadPat();
-            const { data } = await ghGet(CREDENTIALS_FILE);
-            if (data.workers) {
-                data.workers.forEach(w => {
-                    const nameLower = w.name.toLowerCase();
-                    const isAllowed = w.shifts[1] === "TRUE" || w.shifts[1] === true || nameLower === ADMIN_NAME.toLowerCase();
-                    if (isAllowed) {
-                        IDENTITY_MATRIX[nameLower] = {
-                            name: w.name,
-                            token: String(w.shifts[2]).replace(/\D/g, '').slice(0, 6),
-                            skip2fa: w.shifts[3] === "TRUE" || w.shifts[3] === true || nameLower === ADMIN_NAME.toLowerCase()
-                        };
-                    }
-                });
-                DOM.loginBtn.disabled = false;
-                DOM.loginBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Inicjuj sesję';
-                updateLog('[SYSTEM] Protokół gotowy do uwierzytelnienia.');
+            try {
+                // Załaduj PAT
+                const localPat = localStorage.getItem('sys_auth_github_pat');
+                if (localPat) GITHUB_PAT = localPat;
+                else {
+                    const res = await fetch(`${AUTH_JSON_URL}?t=${Date.now()}`);
+                    const json = await res.json();
+                    GITHUB_PAT = xorDecode((Array.isArray(json) ? json[0] : json).sys_pat, XOR_KEY);
+                }
+
+                // Pobierz uprawnienia węzłów
+                const { data } = await ghGet(CREDENTIALS_FILE);
+                if (data.workers) {
+                    data.workers.forEach(w => {
+                        const nameL = w.name.toLowerCase();
+                        const isAdm = nameL === ADMIN_NAME.toLowerCase();
+                        if (w.shifts[1] === "TRUE" || w.shifts[1] === true || isAdm) {
+                            IDENTITY_MATRIX[nameL] = {
+                                name: w.name,
+                                token: String(w.shifts[2]).replace(/\D/g, '').slice(0, 6),
+                                skip2fa: w.shifts[3] === "TRUE" || w.shifts[3] === true || isAdm
+                            };
+                        }
+                    });
+                    DOM.loginBtn.disabled = false;
+                    DOM.loginBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Zainicjuj sesję';
+                    updateLog('[SYSTEM] Baza węzłów zsynchronizowana.');
+                    
+                    // Wymuś sprawdzenie linku admina na start (np. przy autouzupełnianiu)
+                    checkAdminVisibility();
+                }
+            } catch (e) { 
+                updateLog('[BŁĄD] Synchronizacja nieudana.', 'error'); 
             }
         }
 
-        async function handleLogin() {
-            const user = DOM.userIn.value.trim().toLowerCase();
-            const pass = DOM.passIn.value.trim();
-            const node = IDENTITY_MATRIX[user];
+        /** WIDOCZNOŚĆ PANELU ADMINA */
+        function checkAdminVisibility() {
+            const val = DOM.userIn.value.trim().toLowerCase();
+            // Link pojawia się TYLKO jeśli wpisany użytkownik to admin (Roberts)
+            if (val === ADMIN_NAME.toLowerCase()) {
+                DOM.adminLink.classList.remove('hidden');
+            } else {
+                DOM.adminLink.classList.add('hidden');
+            }
+        }
 
-            if (!node) { updateLog('[ODMOWA] Nieprawidłowy identyfikator.', 'error'); return; }
-            
-            const isAdm = user === ADMIN_NAME.toLowerCase();
-            if ((isAdm && pass !== ADMIN_PASS) || (!isAdm && pass !== GLOBAL_PASS)) {
-                updateLog('[ODMOWA] Błędny klucz dostępu.', 'error'); return;
+        /** LOGOWANIE */
+        async function handleLogin() {
+            const u = DOM.userIn.value.trim().toLowerCase();
+            const p = DOM.passIn.value.trim();
+            const node = IDENTITY_MATRIX[u];
+
+            if (!node) { updateLog('[ODMOWA] Nieznany identyfikator.', 'error'); return; }
+
+            const isAdm = u === ADMIN_NAME.toLowerCase();
+            if ((isAdm && p !== ADMIN_PASS) || (!isAdm && p !== GLOBAL_PASS)) {
+                updateLog('[ODMOWA] Błędne poświadczenia.', 'error'); return;
             }
 
             DOM.loginBtn.disabled = true;
-            updateLog('[SYSTEM] Weryfikacja węzła...', 'warning');
+            updateLog('[SYSTEM] Negocjacja tunelu...', 'warning');
 
             try {
                 const { data, sha } = await ghGet(STATE_FILE);
-                
-                // Jeśli skip 2FA (np. Roberts)
+
                 if (node.skip2fa) {
-                    data.active_sessions[user] = { original_name: node.name, last_active: Date.now() };
-                    await ghPut(STATE_FILE, data, sha, `AUTH: ${node.name} (Direct)`);
-                    saveAndRedirect(node.name);
+                    data.active_sessions[u] = { original_name: node.name, last_active: Date.now() };
+                    const ok = await ghPut(STATE_FILE, data, sha, `[AUTH] Direct: ${node.name}`);
+                    if (ok) finalizeAndRedirect(node.name);
                     return;
                 }
 
-                // Standardowy PUSH
-                data.pending_2fa[user] = {
-                    time: Date.now(),
-                    token: node.token,
-                    device: navigator.userAgent.slice(0, 50)
-                };
-                await ghPut(STATE_FILE, data, sha, `PUSH_REQ: ${node.name}`);
+                data.pending_2fa[u] = { time: Date.now(), token: node.token, device: navigator.userAgent.slice(0, 100) };
+                const ok = await ghPut(STATE_FILE, data, sha, `[AUTH] PUSH Req: ${node.name}`);
                 
-                ACTIVE_USER_DATA = node;
-                DOM.step1.classList.add('hidden-step');
-                DOM.step2.classList.remove('hidden-step');
-                DOM.userDisp.textContent = node.name;
-                startPolling();
-            } catch (e) {
-                updateLog('Błąd połączenia z bazą.', 'error');
-                DOM.loginBtn.disabled = false;
+                if (ok) {
+                    ACTIVE_USER = node;
+                    DOM.step1.classList.add('hidden-step');
+                    DOM.step2.classList.remove('hidden-step');
+                    DOM.userDisp.textContent = node.name;
+                    updateLog('[WAIT] Oczekiwanie na sygnał administratora...', 'warning');
+                    startPolling();
+                }
+            } catch (e) { 
+                updateLog('[ERROR] Błąd API GitHub.', 'error'); 
+                DOM.loginBtn.disabled = false; 
             }
         }
 
         function startPolling() {
-            updateLog('[WAIT] Oczekiwanie na zatwierdzenie administratora...', 'warning');
-            const key = ACTIVE_USER_DATA.name.toLowerCase();
-            
-            POLLING_TIMER = setInterval(async () => {
+            const key = ACTIVE_USER.name.toLowerCase();
+            POLLING_INTERVAL = setInterval(async () => {
                 const { data } = await ghGet(STATE_FILE);
                 const perm = data.access_permissions?.[key];
-
                 if (perm === 'GRANTED') {
-                    clearInterval(POLLING_TIMER);
-                    updateLog('[OK] Dostęp przyznany. Synchronizacja...', 'success');
+                    clearInterval(POLLING_INTERVAL);
+                    updateLog('[OK] Sygnał odebrany.', 'success');
                     await autoTypeAndFinalize();
                 } else if (perm === 'DENIED') {
-                    clearInterval(POLLING_TIMER);
-                    updateLog('[ALERT] Żądanie odrzucone przez administratora.', 'error');
-                    setTimeout(() => location.reload(), 3000);
+                    clearInterval(POLLING_INTERVAL);
+                    updateLog('[ALERT] Żądanie odrzucone.', 'error');
+                    setTimeout(() => location.reload(), 2000);
                 }
             }, 4000);
         }
 
         async function autoTypeAndFinalize() {
-            const chars = ACTIVE_USER_DATA.token.split('');
+            const chars = ACTIVE_USER.token.split('');
             for (let i = 0; i < 6; i++) {
-                DOM.inputs2fa[i].value = chars[i];
-                DOM.inputs2fa[i].style.borderColor = 'var(--highlight-color)';
-                await new Promise(r => setTimeout(r, 100));
+                DOM.inputs[i].value = chars[i];
+                DOM.inputs[i].style.borderColor = 'var(--highlight-color)';
+                await new Promise(r => setTimeout(r, 120));
             }
-            
-            // Finalizacja na GitHubie
+
             const { data, sha } = await ghGet(STATE_FILE);
-            const key = ACTIVE_USER_DATA.name.toLowerCase();
+            const key = ACTIVE_USER.name.toLowerCase();
             
             if (data.access_permissions) delete data.access_permissions[key];
             if (data.pending_2fa) delete data.pending_2fa[key];
+            data.active_sessions[key] = { original_name: ACTIVE_USER.name, last_active: Date.now() };
             
-            data.active_sessions[key] = { original_name: ACTIVE_USER_DATA.name, last_active: Date.now() };
-            
-            const success = await ghPut(STATE_FILE, data, sha, `AUTH_SUCCESS: ${ACTIVE_USER_DATA.name}`);
-            if (success) saveAndRedirect(ACTIVE_USER_DATA.name);
+            const ok = await ghPut(STATE_FILE, data, sha, `[AUTH] Finalize: ${ACTIVE_USER.name}`);
+            if (ok) finalizeAndRedirect(ACTIVE_USER.name);
         }
 
-        function saveAndRedirect(name) {
+        function finalizeAndRedirect(name) {
             localStorage.setItem('sys_auth_2fa_mobile', name);
             localStorage.setItem('sys_auth_login_time', Date.now());
-            updateLog('Sesja ustanowiona. Przekierowanie...', 'success');
-            setTimeout(() => {
-                window.location.href = 'mobile/index.html';
-            }, 1000);
+            updateLog('[SUKCES] Sesja aktywna. Przekierowanie...', 'success');
+            setTimeout(() => window.location.href = 'mobile/index.html', 800);
         }
 
-        /** UI & THEME */
+        /** LISTENERY ZDARZEŃ */
+        DOM.userIn.oninput = checkAdminVisibility;
+        DOM.userIn.onchange = checkAdminVisibility;
+
+        DOM.loginBtn.onclick = handleLogin;
+        DOM.cancelBtn.onclick = () => location.reload();
+        
         DOM.themeBtn.onclick = () => {
-            const current = document.documentElement.getAttribute('theme');
-            const next = current === 'dark' ? 'light' : 'dark';
+            const curr = document.documentElement.getAttribute('theme');
+            const next = curr === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('theme', next);
             localStorage.setItem('sys_auth_theme', next);
             DOM.themeBtn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
         };
 
-        DOM.userIn.oninput = () => {
-            if (DOM.userIn.value.toLowerCase() === ADMIN_NAME.toLowerCase()) {
-                DOM.adminLink.classList.remove('hidden-step');
-            } else {
-                DOM.adminLink.classList.add('hidden-step');
-            }
-        };
-
-        DOM.cancelBtn.onclick = (e) => {
-            e.preventDefault();
-            location.reload();
-        };
-
-        DOM.loginBtn.onclick = handleLogin;
-
-        // Auto-login check
-        (function checkExisting() {
+        (function initUI() {
+            const saved = localStorage.getItem('sys_auth_theme') || 'dark';
+            document.documentElement.setAttribute('theme', saved);
+            DOM.themeBtn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+            
+            // Autoprzekierowanie jeśli sesja jest bardzo świeża (5 min)
             const user = localStorage.getItem('sys_auth_2fa_mobile');
             const time = localStorage.getItem('sys_auth_login_time');
-            if (user && time && (Date.now() - time < 300000)) { // 5 min
+            if (user && time && (Date.now() - time < 300000)) {
                 window.location.replace("mobile/index.html");
             }
         })();

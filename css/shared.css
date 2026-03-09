@@ -98,6 +98,17 @@
     --json-string: var(--success-color);
     --json-number: #005cc5;
     --json-boolean: var(--danger-color);
+
+    --glass-noise-background:
+        radial-gradient(circle at 60% -100%, #fffbe3cc 0%, #e3f2fd4d 75%),
+        conic-gradient(#ffffff66 0.25turn,
+            #fffde680 0.25turn 0.5turn,
+            #ffffff66 0.5turn 0.75turn,
+            #fffde680 0.75turn) top left / 4px 4px repeat,
+        #f6f8fa;
+    --group-y: #ffc107;
+    --bg-stripe-pattern-y: linear-gradient(45deg, var(--group-y) 25%, transparent 25%, transparent 50%, var(--group-y) 50%,
+            var(--group-y) 75%, transparent 75%, transparent);
 }
 
 /* Wyłączenie transition przy zmianie motywu */
@@ -177,4 +188,13 @@
     --json-string: #85e89d;
     --json-number: #79b8ff;
     --json-boolean: #f97583;
+
+
+    --glass-noise-background:
+        radial-gradient(circle at 160% -100%, #8f7c6a8a 0%, #0001 55%),
+        conic-gradient(#ffffff14 0.25turn,
+            #ffffff20 0.25turn 0.5turn,
+            #ffffff14 0.5turn 0.75turn,
+            #ffffff20 0.75turn) top left / 4px 4px repeat,
+        #010405;
 }

@@ -13,54 +13,69 @@
     <link rel="stylesheet" href="css/logowanie.css">
 </head>
 
-
 <body>
 
     <div class="sys-terminal">
         <header>
             <span class="sys-id">SEC_MODULE // AUTO_PUSH_AUTH</span>
-            <button id="theme-btn"><i class="fas fa-moon"></i></button>
+            <button class="theme-override" id="theme-btn"><i class="fas fa-moon"></i></button>
         </header>
 
-        <!-- KROK 1: LOGIN -->
+        <!-- KROK 1 -->
         <main class="auth-core" id="step-1">
             <h1>Identyfikacja L1</h1>
-            <p>Wprowadź Name i klucz globalny. Wymagana autoryzacja PUSH.</p>
-            <input type="text" id="sys-user" class="credential-input" placeholder="NAME (GitHub)" autocomplete="off">
+            <p>Wprowadź Name i klucz globalny. Wymagane autoryzowanie PUSH z konsoli administratora.</p>
+            <input type="text" id="sys-user" class="credential-input" placeholder="NAME (z GitHub)">
             <input type="password" id="sys-pass" class="credential-input" placeholder="HASŁO GLOBALNE">
-            <button class="trigger-btn" id="login-trigger" disabled>
-                <i class="fas fa-right-to-bracket"></i> Inicjalizacja...
-            </button>
-            <div class="aux-links">
-                <a href="admin.html" id="link-admin-panel" class="hidden-step"><i class="fas fa-user-shield"></i> Admin Panel</a>
-            </div>
+            <button class="trigger-btn" id="login-trigger" disabled><i class="fas fa-right-to-bracket"></i>
+                Inicjalizacja środowiska...</button>
         </main>
 
-        <!-- KROK 2: WAIT -->
+        <!-- KROK 2 (AUTO PUSH WAIT) -->
         <main class="auth-core hidden-step" id="step-2">
             <h1>Autoryzacja PUSH</h1>
-            <p>Węzeł: <span id="current-user-display" style="color: var(--highlight-color);"></span></p>
+            <p>Nasłuchiwanie na zezwolenie administratora dla węzła:
+                <span id="current-user-display" style="color: var(--highlight-color);"></span>
+            </p>
 
             <div class="token-matrix" id="token-container">
-                <input type="text" class="crypt-input" readonly maxlength="1">
-                <input type="text" class="crypt-input" readonly maxlength="1">
-                <input type="text" class="crypt-input" readonly maxlength="1">
-                <input type="text" class="crypt-input" readonly maxlength="1">
-                <input type="text" class="crypt-input" readonly maxlength="1">
-                <input type="text" class="crypt-input" readonly maxlength="1">
+                <input type="number" class="crypt-input" readonly><input type="number" class="crypt-input"
+                    readonly><input type="number" class="crypt-input" readonly>
+                <input type="number" class="crypt-input" readonly><input type="number" class="crypt-input"
+                    readonly><input type="number" class="crypt-input" readonly>
             </div>
 
             <button class="trigger-btn" id="auth-trigger" disabled>
-                <span class="loader"></span> <span>Oczekiwanie na sygnał...</span>
+                <span class="loader" id="wait-spinner"></span> <i class="fas fa-fingerprint"></i> Oczekiwanie na
+                sygnał...
             </button>
 
             <div class="aux-links">
                 <a href="#" id="cancel-trigger"><i class="fas fa-xmark"></i> Przerwij żądanie</a>
+                <a href="mobile/index.html" id="link-mobile-panel" class="hidden" style="margin-left: 1rem;"><i
+                        class="fas fa-mobile-screen"></i> Panel mobilny</a>
+                <a href="admin.html" id="link-admin-panel" class="hidden" style="margin-left: 1rem;"><i
+                        class="fas fa-user-shield"></i> Panel administratora</a>
             </div>
         </main>
 
-        <div class="status-console" id="status-log">[SYSTEM] Booting...</div>
+        <div class="status-console" id="status-log">[SYSTEM] Oczekiwanie na definicję klucza API...</div>
     </div>
+
+    <!-- PRE-CHECK: Automatyczne logowanie Admina -->
+    <script>
+        (function () {
+            var admin = (function () { try { return atob('Um9iZXJ0cw=='); } catch (e) { return ''; } })(); // Roberts
+            if (!admin) return;
+            try {
+                var storedUser = localStorage.getItem('sys_auth_2fa_mobile');
+                if (storedUser && storedUser.trim().toLowerCase() === admin.toLowerCase()) {
+                    // Od razu przekieruj na mobile panel
+                    window.location.replace("mobile/index.html");
+                }
+            } catch (e) { }
+        })();
+    </script>
 
 <script>
         /** KONFIGURACJA I DEKODOWANIE */
@@ -303,3 +318,4 @@
     </script>
 </body>
 </html>
+

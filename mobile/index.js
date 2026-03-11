@@ -117,7 +117,7 @@ function checkAccessStillValid() {
             } else {
                 window._isLoggedOutByAdmin = false;
                 updateHeaderActiveKey();
-                window.location.href = LOGIN_PAGE_URL + "  ";
+              //  window.location.href = LOGIN_PAGE_URL + "  ";
             }
         })
         .catch(function () { });
@@ -1545,3 +1545,4 @@ whenReady(function () {
         return false;
     });
 });
+

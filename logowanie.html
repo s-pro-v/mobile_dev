@@ -78,6 +78,18 @@
     </script>
 
 <script>
+      /** ANTI-LOOP PROTOCOL: Zatrzymuje zjawisko "cofa się i do przodu robi" */
+        (function mitigateRedirectLoop() {
+            const referrer = document.referrer.toLowerCase();
+            // Jeśli powróciliśmy z obszaru mobile to znak, że sesja tam wygasła
+            // lub wystąpił błąd. Wyczyszczenie danych zablokuje natychmiastowe, błędne odesłanie.
+            if (referrer.includes('mobile/index.html') || referrer.includes('mobile/')) {
+                console.warn('[SYS.AUTH] Wykryto odbicie z instancji podrzędnej (mobile). Resetuję klucze sesyjne.');
+                localStorage.removeItem('sys_auth_2fa_mobile');
+                localStorage.removeItem('sys_auth_login_time');
+            }
+        })();
+
         /** KONFIGURACJA I DEKODOWANIE */
         const AUTH_JSON_URL = 'https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/dev/auth.json';
         const XOR_KEY = atob('dzVn');
@@ -147,7 +159,6 @@
         /** INICJALIZACJA SYSTEMU */
         async function init() {
             try {
-                // Załaduj PAT
                 const localPat = localStorage.getItem('sys_auth_github_pat');
                 if (localPat) GITHUB_PAT = localPat;
                 else {
@@ -156,7 +167,6 @@
                     GITHUB_PAT = xorDecode((Array.isArray(json) ? json[0] : json).sys_pat, XOR_KEY);
                 }
 
-                // Pobierz uprawnienia węzłów
                 const { data } = await ghGet(CREDENTIALS_FILE);
                 if (data.workers) {
                     data.workers.forEach(w => {
@@ -172,20 +182,17 @@
                     });
                     DOM.loginBtn.disabled = false;
                     DOM.loginBtn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Zainicjuj sesję';
-                    updateLog('[SYSTEM] Baza węzłów zsynchronizowana.');
+                    updateLog('[SYSTEM] Baza węzłów zsynchronizowana.', 'success');
                     
-                    // Wymuś sprawdzenie linku admina na start (np. przy autouzupełnianiu)
                     checkAdminVisibility();
                 }
             } catch (e) { 
-                updateLog('[BŁĄD] Synchronizacja nieudana.', 'error'); 
+                updateLog('[BŁĄD] Synchronizacja topologii nieudana.', 'error'); 
             }
         }
 
-        /** WIDOCZNOŚĆ PANELU ADMINA */
         function checkAdminVisibility() {
             const val = DOM.userIn.value.trim().toLowerCase();
-            // Link pojawia się TYLKO jeśli wpisany użytkownik to admin (Roberts)
             if (val === ADMIN_NAME.toLowerCase()) {
                 DOM.adminLink.classList.remove('hidden');
             } else {
@@ -199,15 +206,15 @@
             const p = DOM.passIn.value.trim();
             const node = IDENTITY_MATRIX[u];
 
-            if (!node) { updateLog('[ODMOWA] Nieznany identyfikator.', 'error'); return; }
+            if (!node) { updateLog('[ODMOWA] Nieznany identyfikator terminala.', 'error'); return; }
 
             const isAdm = u === ADMIN_NAME.toLowerCase();
             if ((isAdm && p !== ADMIN_PASS) || (!isAdm && p !== GLOBAL_PASS)) {
-                updateLog('[ODMOWA] Błędne poświadczenia.', 'error'); return;
+                updateLog('[ODMOWA] Błędne poświadczenia weryfikacyjne.', 'error'); return;
             }
 
             DOM.loginBtn.disabled = true;
-            updateLog('[SYSTEM] Negocjacja tunelu...', 'warning');
+            updateLog('[SYSTEM] Negocjacja tunelu kryptograficznego...', 'warning');
 
             try {
                 const { data, sha } = await ghGet(STATE_FILE);
@@ -227,7 +234,7 @@
                     DOM.step1.classList.add('hidden-step');
                     DOM.step2.classList.remove('hidden-step');
                     DOM.userDisp.textContent = node.name;
-                    updateLog('[WAIT] Oczekiwanie na sygnał administratora...', 'warning');
+                    updateLog('[WAIT] Oczekiwanie na sygnał potwierdzający...', 'warning');
                     startPolling();
                 }
             } catch (e) { 
@@ -243,11 +250,11 @@
                 const perm = data.access_permissions?.[key];
                 if (perm === 'GRANTED') {
                     clearInterval(POLLING_INTERVAL);
-                    updateLog('[OK] Sygnał odebrany.', 'success');
+                    updateLog('[OK] Sygnał odebrany. Dekodowanie matrycy.', 'success');
                     await autoTypeAndFinalize();
                 } else if (perm === 'DENIED') {
                     clearInterval(POLLING_INTERVAL);
-                    updateLog('[ALERT] Żądanie odrzucone.', 'error');
+                    updateLog('[ALERT] Żądanie zablokowane na szczeblu nadrzędnym.', 'error');
                     setTimeout(() => location.reload(), 2000);
                 }
             }, 4000);
@@ -265,7 +272,6 @@
             const key = ACTIVE_USER.name.toLowerCase();
             
             if (data.access_permissions) delete data.access_permissions[key];
-            // POPRAWKA: Bezwzględne czyszczenie cache z pending_2fa
             if (data.pending_2fa) delete data.pending_2fa[key];
             
             data.active_sessions[key] = { original_name: ACTIVE_USER.name, last_active: Date.now() };
@@ -277,16 +283,14 @@
         function finalizeAndRedirect(name) {
             localStorage.setItem('sys_auth_2fa_mobile', name);
             localStorage.setItem('sys_auth_login_time', Date.now());
-            updateLog('[SUKCES] Sesja aktywna. Przekierowanie...', 'success');
+            updateLog('[SUKCES] Sesja L1 aktywna. Rutowanie...', 'success');
             
-            // POPRAWKA: Opóźnienie przekierowania (1 sekunda) 
-            // daje to czas dla serwerów GitHub na spropagowanie najnowszych zmian w cache.
             setTimeout(() => {
-                window.location.href = 'mobile/index.html';
+                window.location.replace('mobile/index.html');
             }, 1000);
         }
 
-        /** LISTENERY ZDARZEŃ */
+        /** INITIALIZACJA UI & LISTENERY */
         DOM.userIn.oninput = checkAdminVisibility;
         DOM.userIn.onchange = checkAdminVisibility;
 
@@ -306,11 +310,13 @@
             document.documentElement.setAttribute('theme', saved);
             DOM.themeBtn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
             
-            // Autoprzekierowanie jeśli sesja jest bardzo świeża (5 min)
+            // Logika wznawiania sesji
             const user = localStorage.getItem('sys_auth_2fa_mobile');
             const time = localStorage.getItem('sys_auth_login_time');
             if (user && time && (Date.now() - time < 300000)) {
-                window.location.replace("mobile/index.html");
+                updateLog(`[SYSTEM] Zidentyfikowano świeży token dostępu dla [${user}].`, 'warning');
+                // Jeśli referrer to nie strona mobilna (sprawdzone na początku pliku), idziemy dalej.
+                setTimeout(() => window.location.replace("mobile/index.html"), 1000);
             }
         })();
 
@@ -318,4 +324,5 @@
     </script>
 </body>
 </html>
+
 

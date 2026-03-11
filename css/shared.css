@@ -109,6 +109,8 @@
     --group-y: #ffc107;
     --bg-stripe-pattern-y: linear-gradient(45deg, var(--group-y) 25%, transparent 25%, transparent 50%, var(--group-y) 50%,
             var(--group-y) 75%, transparent 75%, transparent);
+
+    --dark-image: linear-gradient(133.84deg, #fffbe3 -16.04%, #e4e4e4 9.33%, #fafafa 32.02%, #fafafa 62.06%, #f8f9fa 87.42%, #fffbe3 112.12%);
 }
 
 /* Wyłączenie transition przy zmianie motywu */
@@ -197,4 +199,7 @@
             #ffffff14 0.5turn 0.75turn,
             #ffffff20 0.75turn) top left / 4px 4px repeat,
         #010405;
+
+    --dark-image: linear-gradient(133.84deg, #4E4E4E -16.04%, #333333 9.33%, #1A1A1A 32.02%, #1A1A1A 62.06%, #262626 87.42%, #4E4E4E 112.12%);
+
 }

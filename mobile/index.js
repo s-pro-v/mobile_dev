@@ -46,6 +46,7 @@ const URL_STATE = "https://raw.githubusercontent.com/" + GITHUB_USER + "/" + GIT
 /** URL API GitHub do odczytu/zapisu pliku stanu (wylogowanie z mobile → aktualizacja active_sessions). */
 const GITHUB_API_STATE = "https://api.github.com/repos/" + GITHUB_USER + "/" + GITHUB_REPO + "/contents/" + STATE_FILE_PATH;
 /** Klucz tokenu w localStorage (ten sam co w admin / logowanie) – do zapisu wylogowania w JSON. */
+/** Ten sam klucz API co logowanie i admin – wspólny dla całego systemu. */
 const GITHUB_PAT_STORAGE = "sys_auth_github_pat";
 /** Nazwa admina – link do panelu admina widoczny tylko dla tego użytkownika (zgodnie z logowanie/admin). Zakodowane. */
 const ADMIN_DISPLAY_NAME = (function () { try { return atob("Um9iZXJ0cw=="); } catch (e) { return ""; } })();
@@ -92,13 +93,13 @@ function checkAccessStillValid() {
             var sessions = data.active_sessions;
             if (!sessions || typeof sessions !== "object") sessions = {};
             var session = sessions[userKey];
-            
+
             // Bypass wylogowania dla administratora
             var admin = (ADMIN_DISPLAY_NAME || "").trim().toLowerCase();
             if (admin && userKey === admin) {
-                 window._isLoggedOutByAdmin = false;
-                 updateHeaderActiveKey();
-                 return;
+                window._isLoggedOutByAdmin = false;
+                updateHeaderActiveKey();
+                return;
             }
 
             if (!session || typeof session !== "object") {
@@ -117,7 +118,6 @@ function checkAccessStillValid() {
             } else {
                 window._isLoggedOutByAdmin = false;
                 updateHeaderActiveKey();
-              //  window.location.href = LOGIN_PAGE_URL + "  ";
             }
         })
         .catch(function () { });
@@ -235,14 +235,14 @@ function toBase64(str) {
         return btoa(unescape(encodeURIComponent(str)));
     } catch (e) { return ""; }
 }
-/** Przy wylogowaniu z mobile – usuwa użytkownika z active_sessions i dopisuje audit_log w pliku stanu (jeśli jest token). */
+/** Przy wylogowaniu użytkownika z mobile: usuwa go z active_sessions i dopisuje wpis do audit_log (zapis na GitHub). */
 function syncLogoutToGitHub(userName) {
     var token = getGitHubToken();
     if (!token || !userName || !String(userName).trim()) return Promise.resolve();
     var userKey = String(userName).trim().toLowerCase();
     var url = GITHUB_API_STATE + "?t=" + Date.now();
     return fetch(url, {
-        headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github.v3+json" }
+        headers: { "Authorization": "token " + token, "Accept": "application/vnd.github.v3+json" }
     }).then(function (res) {
         if (!res.ok) return;
         return res.json();
@@ -253,7 +253,7 @@ function syncLogoutToGitHub(userName) {
         if (content) try { data = JSON.parse(content); } catch (e) { }
         data.active_sessions = data.active_sessions || {};
         data.audit_log = data.audit_log || [];
-        if (!data.active_sessions[userKey]) return;
+        /* Zawsze usuń użytkownika z active_sessions – po wylogowaniu nie może być na liście aktywnych. */
         delete data.active_sessions[userKey];
         var ts = new Date().toLocaleString("pl-PL");
         data.audit_log.unshift("[".concat(ts, "] USER_LOGOUT: ", userName.trim(), " wylogował się (mobile)."));
@@ -262,7 +262,7 @@ function syncLogoutToGitHub(userName) {
         if (fileData.sha) body.sha = fileData.sha;
         return fetch(GITHUB_API_STATE, {
             method: "PUT",
-            headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github.v3+json", "Content-Type": "application/json" },
+            headers: { "Authorization": "token " + token, "Accept": "application/vnd.github.v3+json", "Content-Type": "application/json" },
             body: JSON.stringify(body)
         });
     }).catch(function () { });
@@ -270,7 +270,16 @@ function syncLogoutToGitHub(userName) {
 function doLogout() {
     var userName = "";
     try { userName = localStorage.getItem(SYS_AUTH_2FA_STORAGE) || ""; } catch (e) { }
-    syncLogoutToGitHub(userName).finally(function () {
+    /* Czekamy na zakończenie zapisu na GitHub (usunięcie z active_sessions), potem czyścimy lokalnie i przeładowujemy. */
+    syncLogoutToGitHub(userName).then(function () {
+        try {
+            localStorage.removeItem("accessKey");
+            localStorage.removeItem("accessKeyDisplay");
+            localStorage.removeItem("activeAccessKey");
+            localStorage.removeItem(SYS_AUTH_2FA_STORAGE);
+        } catch (e) { }
+        location.reload();
+    }).catch(function () {
         try {
             localStorage.removeItem("accessKey");
             localStorage.removeItem("accessKeyDisplay");
@@ -1545,4 +1554,3 @@ whenReady(function () {
         return false;
     });
 });
-

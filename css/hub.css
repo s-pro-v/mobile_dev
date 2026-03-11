@@ -56,6 +56,7 @@ body::before {
     background: var(--bg-color);
     padding: 0.7rem 1rem;
     box-shadow: var(--shadow-drop);
+    background: linear-gradient(180deg, #2a2a2a, #1a1a1a);
 }
 
 .hub-theme-btn {
@@ -164,73 +165,94 @@ body::before {
 
 .hub-card {
     display: flex;
-    flex-direction: row;
+    justify-content: center;
     align-items: center;
-    gap: 1rem;
     padding: 0.5rem 1rem;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
+    font-size: 11px;
     text-decoration: none;
-    transition: border-color 0.2s, background 0.2s, color 0.2s, box-shadow 0.2s;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 1px;
+
+    background: var(--metal-gradient);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
     box-shadow: var(--shadow-drop);
-    background: var(--glass-noise-background);
     position: relative;
     overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    cursor: pointer;
+
+    /* Top Cut */
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0.5px;
+        left: 0;
+        width: 150%;
+        height: 5px;
+        background: linear-gradient(225deg, transparent 0%, var(--border-color) 48%, transparent 50%);
+        border-top: 2px solid var(--border-color);
+        transition: all 0.4s ease;
+        z-index: 5;
+    }
+
+    /* Bottom Cut */
+    &::after {
+        content: '';
+        position: absolute;
+        bottom: 0.5px;
+        right: 0;
+        width: 40px;
+        min-width: 150%;
+        height: 5px;
+        background: linear-gradient(45deg, transparent 0%, var(--border-color) 50%, transparent 50%);
+        border-bottom: 2px solid var(--border-color);
+        transition: all 0.4s ease;
+        z-index: 5;
+    }
+
+    &:hover {
+        background-color: var(--hover-bg);
+        color: var(--text-color);
+
+        &::after {
+            right: -50px;
+            border-color: transparent;
+        }
+
+        &::before {
+            left: -50px;
+            border-color: transparent;
+        }
+    }
+
+    &.active {
+        color: var(--text-color);
+        background-color: var(--bg-color);
+        border-color: var(--hover-bg);
+
+        &::before {
+            background: linear-gradient(225deg, var(--hover-bg) 50%, transparent 50%);
+            border-top: 2px solid var(--hover-bg);
+        }
+
+        &::after {
+            background: linear-gradient(45deg, var(--hover-bg) 50%, transparent 50%);
+            border-bottom: 2px solid var(--hover-bg);
+            width: 100%;
+        }
+    }
+
+    &:active {
+        box-shadow: var(--shadow-inset);
+        color: var(--text-muted);
+
+
+    }
 }
 
-.hub-card-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    flex: 1;
-    min-width: 0;
-}
 
-.hub-card:hover {
-    color: var(--highlight-color);
-    box-shadow: var(--shadow-hover);
-    background-color: var(--bg);
-}
-
-.hub-card::before {
-    content: " ";
-    position: absolute;
-    top: 1px;
-    left: 30%;
-    width: 100%;
-    height: 100%;
-    height: 28px;
-    background: linear-gradient(90deg, transparent, rgba(120, 120, 120, 0.1), transparent);
-    background: linear-gradient(225deg, var(--border-color-hover) 50%, transparent 50%);
-    border-bottom: 2px solid var(--border-color-hover);
-    transition: 0.5s;
-    z-index: 0;
-
-}
-
-.hub-card:hover::before {
-    left: 20%;
-}
-
-
-.hub-card::after {
-    content: '';
-    position: absolute;
-    bottom: 1px;
-    left: 0%;
-    width: 40px;
-    min-width: 130px;
-    height: 5px;
-    background: linear-gradient(40deg, var(--border-color-hover) 50%, transparent 50%);
-
-    transition: 0.2s;
-    border-bottom: 2px solid var(--border-color-hover);
-    z-index: 0;
-
-}
-
-.hub-card:hover::after {}
 
 
 .hub-card:active {
@@ -247,14 +269,17 @@ body::before {
     justify-content: center;
     color: var(--highlight-color);
     font-size: 1.1rem;
+    transition: color 0.2s;
+    margin-right: 1rem;
 }
 
 .hub-card:hover .hub-card-icon {
-    color: var(--highlight-color);
+    color: var(--text-color);
 }
 
 .hub-card:active .hub-card-icon {
     color: var(--text-muted);
+    background: var(--bg-tertiary);
 }
 
 .hub-card-label {
@@ -324,4 +349,3 @@ body::before {
 
 
 }
-

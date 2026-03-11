@@ -126,9 +126,11 @@
          * Wpisz swoje: właściciel repo, nazwę repo, ścieżkę pliku stanu 2FA.
          */
         /**
-         * Klucz API GitHub – pobierany z auth.json (XOR), fallback: localStorage.
+         * Klucz API GitHub – wspólny dla logowania, admina i mobile.
+         * Źródło: localStorage (sys_auth_github_pat) lub auth.json (XOR).
          * auth.json: [{ "sys_pat": "<base64-XOR-encoded>" }]
          */
+        const GITHUB_PAT_STORAGE = 'sys_auth_github_pat';
         const AUTH_JSON_URL = 'https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/dev/auth.json';
         const XOR_KEY = atob('dzVn');
         let GITHUB_PAT = null;
@@ -144,7 +146,7 @@
 
         async function loadPat() {
             try {
-                const pat = typeof localStorage !== 'undefined' && localStorage.getItem('sys_auth_github_pat');
+                const pat = typeof localStorage !== 'undefined' && localStorage.getItem(GITHUB_PAT_STORAGE);
                 if (pat && pat.trim() !== '') {
                     GITHUB_PAT = pat.trim();
                     return;
@@ -158,6 +160,7 @@
                 const enc = item && item.sys_pat;
                 if (!enc) throw new Error('Brak sys_pat w auth.json');
                 GITHUB_PAT = xorDecode(enc, XOR_KEY);
+                try { localStorage.setItem(GITHUB_PAT_STORAGE, GITHUB_PAT); } catch (e) { /* zapis wspólny dla logowania/mobile */ }
             } catch (e) {
                 throw new Error('Nie można załadować klucza API: ' + (e.message || e));
             }
@@ -183,6 +186,7 @@
             container: document.getElementById('requests-container'),
             sessionsContainer: document.getElementById('sessions-container'),
             auditContainer: document.getElementById('audit-container'),
+            logoutInfoContainer: document.getElementById('logout-info-container'),
             usersCanLoginContainer: document.getElementById('users-can-login-container'),
             ustawieniaContainer: document.getElementById('ustawienia-container'),
             maintenanceStatus: document.getElementById('maintenance-status'),
@@ -232,7 +236,7 @@
             try {
                 res = await fetch(url, {
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`,
+                        'Authorization': `token ${getToken()}`,
                         'Accept': 'application/vnd.github.v3+json'
                     }
                 });
@@ -269,7 +273,7 @@
                 res = await fetch(url, {
                     method: 'PUT',
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`,
+                        'Authorization': `token ${getToken()}`,
                         'Accept': 'application/vnd.github.v3+json',
                         'Content-Type': 'application/json'
                     },
@@ -291,7 +295,7 @@
             try {
                 res = await fetch(url, {
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`,
+                        'Authorization': `token ${getToken()}`,
                         'Accept': 'application/vnd.github.v3+json'
                     }
                 });
@@ -316,7 +320,7 @@
             try {
                 res = await fetch(url, {
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`,
+                        'Authorization': `token ${getToken()}`,
                         'Accept': 'application/vnd.github.v3+json'
                     }
                 });
@@ -342,7 +346,7 @@
             try {
                 res = await fetch(url, {
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`,
+                        'Authorization': `token ${getToken()}`,
                         'Accept': 'application/vnd.github.v3+json'
                     }
                 });
@@ -377,7 +381,7 @@
             }
 
             if (!getToken() && !window._tokenWarningShown) {
-                updateLog('[SYSTEM] Brak tokenu – ustaw GITHUB_PAT lub localStorage (sys_auth_github_pat) dla odczytu i zapisu.', 'warning');
+                updateLog('[SYSTEM] Brak klucza API – ustaw localStorage.setItem("' + GITHUB_PAT_STORAGE + '", "ghp_..."). Ten sam klucz dla logowania, admina i mobile.', 'warning');
                 window._tokenWarningShown = true;
             }
 
@@ -402,6 +406,7 @@
 
                 renderRequests(data.pending_2fa);
                 renderActiveSessions(sessions);
+                renderLogoutInfo(data.audit_log || []);
                 renderAuditLog(data.audit_log || []);
                 fetchAndRenderUsersCanLogin();
                 fetchAndRenderUstawienia();
@@ -436,9 +441,30 @@
                     <span class="name">${String(name).toUpperCase()}</span>
                     <div class="session-item-actions">
                         <span class="time">Last: ${lastActive}</span>
-                        <button type="button" class="btn-logout" title="Wyloguj" onclick="processLogout('${key.replace(/'/g, "\\'")}')"><i class="fas fa-right-from-bracket"></i></button>
+                        <button type="button" class="btn-logout" title="Wyloguj (usuń z active_sessions, dopisz do audit_log)" onclick="processLogout('${key.replace(/'/g, "\\'")}')"><i class="fas fa-right-from-bracket"></i></button>
                     </div>`;
                 DOM.sessionsContainer.appendChild(el);
+            });
+        }
+
+        /** Lista tylko wpisów o wylogowaniu z audit_log (aktualizacja z GitHub). */
+        function renderLogoutInfo(log) {
+            if (!DOM.logoutInfoContainer) return;
+            const lines = Array.isArray(log) ? log : [];
+            const logoutLines = lines.filter(function (line) {
+                const s = String(line).toLowerCase();
+                return s.indexOf('user_logout') !== -1 || s.indexOf('wylogował') !== -1 || s.indexOf('wylogowany') !== -1;
+            }).slice(0, 15);
+            DOM.logoutInfoContainer.innerHTML = '';
+            if (logoutLines.length === 0) {
+                DOM.logoutInfoContainer.innerHTML = '<div class="empty-state">Brak wpisów o wylogowaniu w audit_log.</div>';
+                return;
+            }
+            logoutLines.forEach(function (line) {
+                const el = document.createElement('div');
+                el.className = 'audit-line audit-warning';
+                el.textContent = line;
+                DOM.logoutInfoContainer.appendChild(el);
             });
         }
 
@@ -740,7 +766,7 @@
          */
         window.processDecision = async function (userKey, decision) {
             if (!getToken()) {
-                updateLog('[KRYTYCZNE] Ustaw token: w konsoli wpisz localStorage.setItem("sys_auth_github_pat", "ghp_TWOJ_TOKEN") i odśwież stronę.', 'error');
+                updateLog('[KRYTYCZNE] Ustaw token: w konsoli wpisz localStorage.setItem("' + GITHUB_PAT_STORAGE + '", "ghp_TWOJ_TOKEN") i odśwież – ten sam klucz dla logowania, admina i mobile.', 'error');
                 return;
             }
 
@@ -776,7 +802,7 @@
             }
         };
 
-        /** Wylogowanie pojedynczego węzła */
+        /** Wylogowanie pojedynczego węzła – usuwa sesję i dopisuje wpis do audit_log */
         window.processLogout = async function (userKey) {
             if (!getToken()) {
                 updateLog('[KRYTYCZNE] Ustaw token (GITHUB_PAT lub localStorage).', 'error');
@@ -787,11 +813,12 @@
                 const { data, sha } = await githubGetFile(STATE_FILE);
                 if (data.active_sessions[userKey]) delete data.active_sessions[userKey];
                 const ts = new Date().toLocaleString('pl-PL');
-                data.audit_log.unshift(`[${ts}] ADMIN_ACTION: Wylogowano węzeł -> ${userKey.toUpperCase()}`);
+                data.audit_log.unshift(`[${ts}] USER_LOGOUT: ${userKey.toUpperCase()} wylogowany z panelu admina.`);
                 if (data.audit_log.length > 100) data.audit_log.pop();
                 await githubPutFile(STATE_FILE, data, sha, `[SYS.ADMIN] Wylogowano ${userKey}`);
                 updateLog(`[SUKCES] Węzeł ${userKey.toUpperCase()} wylogowany.`, 'success');
                 renderActiveSessions(data.active_sessions || {});
+                renderLogoutInfo(data.audit_log || []);
                 renderAuditLog(data.audit_log || []);
             } catch (err) {
                 updateLog(`[BŁĄD] ${err.message}`, 'error');
@@ -815,6 +842,7 @@
                 await githubPutFile(STATE_FILE, data, sha, '[SYS.ADMIN] Wylogowano wszystkich');
                 updateLog(`[SUKCES] Wylogowano ${count} węzłów.`, 'success');
                 renderActiveSessions({});
+                renderLogoutInfo(data.audit_log || []);
                 renderAuditLog(data.audit_log || []);
             } catch (err) {
                 updateLog(`[BŁĄD] ${err.message}`, 'error');
@@ -833,6 +861,7 @@
                 data.audit_log = [];
                 await githubPutFile(STATE_FILE, data, sha, '[SYS.ADMIN] Wyczyszczono audit_log');
                 updateLog('[SUKCES] Zdarzenia wyczyszczone.', 'success');
+                renderLogoutInfo([]);
                 renderAuditLog([]);
             } catch (err) {
                 updateLog(`[BŁĄD] ${err.message}`, 'error');

@@ -1,8 +1,22 @@
 @import "shared.css";
 
 /*
- * RESET & GLOBAL DIRECTIVES — logowanie
+ * LOGOWANIE — TECH / TERMINAL AESTHETIC
+ * Skanliny, siatka, HUD, ostre krawędzie.
  */
+:root {
+    --tech-scanline: linear-gradient(180deg, transparent 0%, transparent 96%, rgba(0, 0, 0, 0.04) 96%, rgba(0, 0, 0, 0.04) 100%);
+    --tech-scanline-dark: linear-gradient(180deg, transparent 0%, transparent 96%, rgba(0, 0, 0, 0.15) 96%, rgba(0, 0, 0, 0.15) 100%);
+    --tech-grid-dot: radial-gradient(circle 1px at center, var(--border-color) 0%, transparent 100%);
+    --tech-glow: 0 0 8px rgba(var(--highlight-rgb), 0.2);
+    --tech-glow-strong: 0 0 12px rgba(var(--highlight-rgb), 0.35);
+}
+
+:root[theme="dark"] {
+    --tech-scanline: linear-gradient(180deg, transparent 0%, transparent 96%, rgba(0, 0, 0, 0.2) 96%, rgba(0, 0, 0, 0.2) 100%);
+    --tech-scanline-dark: linear-gradient(180deg, transparent 0%, transparent 94%, rgba(255, 255, 255, 0.02) 94%, rgba(255, 255, 255, 0.02) 100%);
+}
+
 * {
     box-sizing: border-box;
     font-family: 'JetBrains Mono', 'Share Tech Mono', Monaco, Courier, monospace;
@@ -10,7 +24,6 @@
     scrollbar-width: none;
     touch-action: manipulation;
     border-radius: 0 !important;
-    /* STRICT ENFORCEMENT */
 }
 
 body {
@@ -47,6 +60,25 @@ body::before {
     box-shadow: var(--shadow-drop);
     background-image: var(--bg-stripe-pattern);
     background-size: var(--bg-stripe-size);
+    position: relative;
+}
+
+/* Skanliny (CRT) na całym terminalu */
+.sys-terminal::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: var(--tech-scanline);
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 2;
+}
+
+:root[theme="dark"] .sys-terminal::after {
+    background-image: var(--tech-scanline-dark);
 }
 
 .sys-terminal header {
@@ -58,16 +90,58 @@ body::before {
     margin-bottom: 2rem;
     background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    padding: 0.2rem;
+    padding: 0.35rem 0.75rem;
     box-shadow: var(--shadow-inset);
+    position: relative;
 }
+
+/* HUD: narożniki */
+.sys-terminal header::before,
+.sys-terminal header::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border-color: var(--warning-color);
+    border-style: solid;
+    border-width: 0px;
+    opacity: 0.7;
+
+}
+
+.sys-terminal header::before {
+    top: -2px;
+    left: -2px;
+    border-left-width: 2px;
+    border-top-width: 2px;
+}
+
+.sys-terminal header::after {
+    bottom: -2px;
+    right: -2px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+}
+
+
+
 
 .sys-terminal header .sys-id {
     font-weight: bold;
-    letter-spacing: 2px;
+    letter-spacing: 0.25em;
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: 1rem;
     padding: 0.2rem 0.5rem;
+    text-transform: uppercase;
+    text-shadow: 0 0 2px var(--text-muted);
+}
+
+.sys-terminal header .sys-id::before {
+    content: '>';
+    margin-right: 0.35rem;
+    color: var(--warning-color);
+    font-size: 1rem;
+    text-shadow: 0 0 2px var(--warning-color);
 }
 
 .sys-terminal header .theme-override {
@@ -113,14 +187,33 @@ body::before {
 }
 
 .sys-terminal .auth-core h1 {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     margin: 0 0 0.5rem 0;
     text-transform: uppercase;
-    background-color: var(--bg);
-    padding: 0.5rem;
+    letter-spacing: 0.15em;
+    background-color: var(--bg-color);
+    padding: 0.5rem 0.75rem;
     color: var(--text-muted);
     border: 1px solid var(--border-color);
+    border-left: 3px solid var(--warning-color);
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
 }
+
+.sys-terminal .auth-core h1::before {
+    content: '';
+    background: linear-gradient(225deg, transparent 0%, var(--border-color) 48%, transparent 0%);
+    border-top: 2px solid var(--border-color);
+    width: 100%;
+    height: 50%;
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: -1;
+}
+
+
 
 .sys-terminal .auth-core p {
     color: var(--text-muted);
@@ -131,20 +224,27 @@ body::before {
 
 .sys-terminal .auth-core .credential-input {
     width: 100%;
-    padding: 0.5rem;
+    padding: 0.5rem 0.6rem;
     margin-bottom: 1rem;
     background-color: var(--panel-bg);
     border: 1px solid var(--border-color);
     color: var(--text-muted);
-    font-size: 1rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
     box-shadow: var(--shadow-inset);
+    font-family: 'JetBrains Mono', 'Share Tech Mono', Monaco, Courier, monospace;
+}
+
+.sys-terminal .auth-core .credential-input::placeholder {
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
 }
 
 .sys-terminal .auth-core .credential-input:focus {
     outline: none;
     border-bottom-color: var(--warning-color);
-    box-shadow: var(--shadow-inset);
     background-color: var(--hover-bg);
+    color: var(--text-color);
 }
 
 .sys-terminal .auth-core .token-matrix {
@@ -176,8 +276,8 @@ body::before {
 }
 
 .sys-terminal .auth-core .token-matrix input:focus {
-    border-bottom-color: var(--highlight-color);
-    box-shadow: var(--shadow-inset);
+    border-color: var(--highlight-color);
+    box-shadow: var(--shadow-inset), 0 0 6px rgba(var(--highlight-rgb), 0.2);
 }
 
 .sys-terminal .auth-core .token-matrix input::-webkit-outer-spin-button,
@@ -211,12 +311,12 @@ body::before {
 }
 
 .sys-terminal .auth-core .trigger-btn:hover .fas {
-    color: var(--text-color);
+    color: var(--text-muted);
 }
 
 .sys-terminal .auth-core .trigger-btn:hover:not(:disabled) {
     background: var(--hover-bg);
-    color: var(--warning-color);
+    color: var(--text-color);
 }
 
 .sys-terminal .auth-core .trigger-btn:active:not(:disabled) {
@@ -331,30 +431,35 @@ body::before {
 }
 
 .sys-terminal .status-console {
-    margin-top: 2rem;
-    padding: 1rem;
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
     background-color: var(--bg-tertiary);
-    box-shadow: var(--shadow-drop);
+    box-shadow: var(--shadow-inset);
     border-left: 4px solid var(--warning-color);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', 'Share Tech Mono', Monaco, Courier, monospace;
     word-break: break-all;
     white-space: pre-wrap;
     color: var(--text-muted);
+    letter-spacing: 0.02em;
 }
 
 .sys-terminal .status-console.state-success {
     border-left-color: var(--success-color);
     color: var(--success-color);
+    text-shadow: 0 0 2px var(--success-color);
 }
 
 .sys-terminal .status-console.state-error {
     border-left-color: var(--danger-color);
     color: var(--danger-color);
+    text-shadow: 0 0 2px var(--danger-color);
 }
 
 .sys-terminal .status-console.state-warning {
     border-left-color: var(--warning-color);
     color: var(--warning-color);
+    text-shadow: 0 0 2px var(--warning-color);
 }
 
 @keyframes spin {
@@ -437,4 +542,12 @@ body::before {
         font-size: 0.8rem;
         word-break: break-word;
     }
+}
+
+.sys-login {
+    color: var(--text-muted);
+}
+
+.sys-2fa {
+    color: var(--warning-color);
 }

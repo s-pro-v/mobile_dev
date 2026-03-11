@@ -2357,13 +2357,45 @@ i {
 .confirm-modal {
     width: 100%;
     max-width: 22rem;
-    background: var(--panel-bg);
+    background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-left: 4px solid var(--highlight-color);
+    border-left: 4px solid var(--warning-color);
     box-shadow: var(--shadow-drop);
     padding: 1.25rem;
     text-align: center;
     font-family: var(--font-main);
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.confirm-modal ::before {
+    content: '';
+    position: absolute;
+    top: 0.5px;
+    left: 0;
+    width: 150%;
+    height: 45px;
+    background: linear-gradient(225deg, transparent 0%, var(--border-color) 48%, transparent 50%);
+    border-top: 4px solid var(--border-color);
+    transition: all 0.4s ease;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.confirm-modal::after {
+    content: '';
+    position: absolute;
+    bottom: 0.5px;
+    right: 0;
+    width: 30px;
+    min-width: 170%;
+    height: 40px;
+    background: linear-gradient(45deg, transparent 0%, var(--border-color) 50%, transparent 50%);
+    border-bottom: 4px solid var(--border-color);
+    transition: all 0.4s ease;
+    z-index: 5;
+    pointer-events: none;
 }
 
 .confirm-modal-header {
@@ -2377,7 +2409,7 @@ i {
 .confirm-modal-icon {
     width: 1.5rem;
     height: 1.5rem;
-    color: var(--highlight-color);
+    color: var(--warning-color);
 }
 
 .confirm-modal-title {
@@ -2423,6 +2455,12 @@ i {
     color: var(--text-color);
 }
 
+.confirm-modal-btn-cancel:active {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-inset);
+}
+
 .confirm-modal-btn-confirm {
     background: var(--bg-tertiary);
     color: var(--text-color);
@@ -2436,13 +2474,10 @@ i {
 
 .confirm-modal-btn-confirm:active {
     background: color-mix(in srgb, var(--danger-color) 24%, var(--panel-bg));
-    color: var(--text-color);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-inset);
 }
 
-.confirm-modal-btn-confirm:focus {
-    background: color-mix(in srgb, var(--danger-color) 12%, var(--panel-bg));
-    color: var(--text-color);
-}
 
 .confirm-modal-btn-confirm:disabled {
     background: var(--bg-tertiary);
@@ -2459,10 +2494,7 @@ i {
     color: var(--text-muted);
 }
 
-.confirm-modal-btn-confirm:disabled:focus {
-    background: var(--bg-tertiary);
-    color: var(--text-muted);
-}
+
 
 .confirm-modal-btn-confirm:disabled:disabled {
     background: var(--bg-tertiary);

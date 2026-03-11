@@ -14,6 +14,8 @@
 </head>
 
 <body>
+    <div class="vitreous-overlay" aria-hidden="true"></div>
+    <div class="weave-pattern" id="hub-weave" aria-hidden="true"></div>
     <script>
         (function () {
             var SYS_AUTH_2FA_STORAGE = "sys_auth_2fa_mobile";
@@ -36,6 +38,7 @@
             </button>
         </header>
         <main class="hub-main">
+            <div class="visual-matrix" id="strand-container" aria-hidden="true"></div>
             <h1 class="hub-title">2FA</h1>
             <p class="hub-desc">Wybierz panel: logowanie, administracja lub terminal mobilny.</p>
             <nav class="hub-nav">
@@ -113,6 +116,21 @@
                 return false;
             });
         });
+
+        // Weave – podświetlenie siatki za kursorem
+        document.addEventListener("DOMContentLoaded", function () {
+            var weave = document.getElementById("hub-weave");
+            if (weave) {
+                document.addEventListener("mousemove", function (e) {
+                    var x = (e.clientX / window.innerWidth) * 100;
+                    var y = (e.clientY / window.innerHeight) * 100;
+                    weave.style.setProperty("--mouse-x", x + "%");
+                    weave.style.setProperty("--mouse-y", y + "%");
+                });
+            }
+        });
+
+
 
         // Ukryj hub-footer, dodaj przycisk "Dodaj" pod .hub-main, ale z opcją pokaz/ukryj footeru
         document.addEventListener("DOMContentLoaded", function () {

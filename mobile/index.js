@@ -5,11 +5,13 @@ function escapeHtml(str) {
     div.textContent = str;
     return div.innerHTML;
 }
+
 /** Pierwsze 3 litery nazwy (np. "Jan Kowalski" → "Jan", "Anna" → "Ann"). */
 function first3Letters(name) {
     var s = (name && String(name).trim()) ? String(name).trim() : "";
     return s.substring(0, 3);
 }
+
 (function () {
     var d = function (s) { try { return atob(s); } catch (e) { return ""; } };
     window.__G = {
@@ -20,12 +22,14 @@ function first3Letters(name) {
         k: d("c2V0Lmpzb24=")
     };
 })();
+
 const GITHUB_USER = window.__G.u;
 const GITHUB_REPO = window.__G.r;
 const GITHUB_SCHEDULE_FILE = window.__G.s;
 const GITHUB_SETTINGS_FILE = window.__G.f;
 const GITHUB_SET_JSON_FILE = window.__G.k;
 delete window.__G;
+
 /** Główna ścieżka grafiku (repo s-pro-v/json-lista, plik mobile-grafik.json). */
 const URL_SCHEDULE_MAIN = "https://raw.githubusercontent.com/s-pro-v/json-lista/refs/heads/main/mobile-grafik.json";
 /** Fallback na gałąź master, gdy main nie odpowie. */
@@ -45,8 +49,7 @@ const STATE_FILE_PATH = "dev/sys_state.json";
 const URL_STATE = "https://raw.githubusercontent.com/" + GITHUB_USER + "/" + GITHUB_REPO + "/refs/heads/main/" + STATE_FILE_PATH;
 /** URL API GitHub do odczytu/zapisu pliku stanu (wylogowanie z mobile → aktualizacja active_sessions). */
 const GITHUB_API_STATE = "https://api.github.com/repos/" + GITHUB_USER + "/" + GITHUB_REPO + "/contents/" + STATE_FILE_PATH;
-/** Klucz tokenu w localStorage (ten sam co w admin / logowanie) – do zapisu wylogowania w JSON. */
-/** Ten sam klucz API co logowanie i admin – wspólny dla całego systemu. */
+/** Klucz tokenu w localStorage (ten sam co w admin / logowanie) – do zapis wylogowania w JSON. */
 const GITHUB_PAT_STORAGE = "sys_auth_github_pat";
 /** Nazwa admina – link do panelu admina widoczny tylko dla tego użytkownika (zgodnie z logowanie/admin). Zakodowane. */
 const ADMIN_DISPLAY_NAME = (function () { try { return atob("Um9iZXJ0cw=="); } catch (e) { return ""; } })();
@@ -59,6 +62,60 @@ const URL_MAINTENANCE = "https://raw.githubusercontent.com/" + GITHUB_USER + "/"
 let headerUpdateLabel = "Aktualizacja";
 /** true = nowe dane, jednorazowo podświetl datę do kolejnej aktualizacji. */
 let headerUpdateIsNew = false;
+
+// --- STATE ---
+let scheduleData = null;
+let settingsData = null; // GWARANCJA POPRAWNEGO DZIAŁANIA GRUP
+/** Tablica miesięcy: [{ meta, workers }, ...]. Dla jednego miesiąca z JSON: [sched]. */
+let scheduleMonths = [];
+/** Indeks aktualnie wyświetlanego miesiąca (0 = pierwszy). */
+let currentMonthIndex = 0;
+let currentDayIndex = 0;
+let currentView = "daily"; // 'daily' | 'individual'
+
+// --- ELEMENTS ---
+const loader = document.getElementById("loader");
+const themeIcon = document.getElementById("theme-icon");
+const resetDayBtn = document.querySelector(".reset-day-btn");
+
+// Views
+const viewDaily = document.getElementById("view-daily");
+const viewIndividual = document.getElementById("view-individual");
+const controlsDaily = document.getElementById("controls-daily");
+const controlsIndividual = document.getElementById("controls-individual");
+const btnViewDaily = document.getElementById("btn-view-daily");
+const btnViewIndividual = document.getElementById("btn-view-individual");
+
+// Individual Components
+const workerSelectDisplay = document.getElementById("worker-select-display");
+const workerSelectDropdown = document.getElementById("worker-select-dropdown");
+const workerSelectOverlay = document.getElementById("worker-select-overlay");
+const workerSelectWrapper = document.querySelector(".custom-select-wrapper");
+const individualList = document.getElementById("individual-list");
+let selectedWorkerId = null;
+
+// Daily Components
+const list1 = document.getElementById("list-1");
+const listP1 = document.getElementById("list-p1");
+const containerP1 = document.getElementById("container-p1");
+
+const list2 = document.getElementById("list-2");
+const listP2 = document.getElementById("list-p2");
+const containerP2 = document.getElementById("container-p2");
+
+const listOther = document.getElementById("list-other");
+const listAbsent = document.getElementById("list-absent");
+
+const labelDate = document.getElementById("current-date-display");
+const labelName = document.getElementById("current-day-name");
+const labelMonth = document.getElementById("month-label");
+
+const count1El = document.getElementById("count-1");
+const count2El = document.getElementById("count-2");
+const countOtherEl = document.getElementById("count-other");
+const countAbsentEl = document.getElementById("count-absent");
+
+const dayOffsetMap = { PN: 0, WT: 1, SR: 2, ŚR: 2, CZ: 3, PT: 4, SO: 5, ND: 6 };
 
 /**
  * Sprawdza, czy użytkownik nadal ma dostęp (jest w active_sessions – admin go nie wylogował).
@@ -137,8 +194,8 @@ function updateHeaderActiveKey() {
                 if (userName && userName.trim()) {
                     window._lastKnownUserName = userName;
                     let badge = window._isLoggedOutByAdmin
-                        ? "<span style='color: var(--danger-color, #dc3545); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 4px; background: rgba(220, 53, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Wylogowany</span>"
-                        : "<span style='color: var(--success-color, #28a745); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 4px; background: rgba(40, 167, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Aktywny</span>";
+                        ? "<span style='color: var(--danger-color, #dc3545); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 0; background: rgba(220, 53, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Wylogowany</span>"
+                        : "<span style='color: var(--success-color, #28a745); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 0; background: rgba(40, 167, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Aktywny</span>";
 
                     label = "Zalogowany: " + escapeHtml(first3Letters(userName)) + badge;
                 }
@@ -176,8 +233,6 @@ function formatUpdateDate(str) {
 /**
  * Pobiera datę z JSON (root date lub meta.date / meta.generated). Ustawia headerUpdateLabel na datę
  * i headerUpdateIsNew = true tylko przy pierwszym wejściu z nowymi danymi (potem zapis w localStorage).
- * @param {object} schedData - surowa odpowiedź (mobile-grafik.json), może mieć pole date
- * @param {Array} scheduleMonths - tablica miesięcy; meta.date / meta.generated brane z drugiego miesiąca (indeks 1), lub z pierwszego gdy jest tylko jeden
  */
 function checkScheduleUpdate(schedData, scheduleMonths) {
     const list = Array.isArray(scheduleMonths) ? scheduleMonths : (scheduleMonths ? [scheduleMonths] : []);
@@ -225,16 +280,19 @@ function getGitHubToken() {
         return (t && typeof t === "string") ? t.trim() : "";
     } catch (e) { return ""; }
 }
+
 function fromBase64(b64) {
     try {
         return decodeURIComponent(escape(atob(b64)));
     } catch (e) { return ""; }
 }
+
 function toBase64(str) {
     try {
         return btoa(unescape(encodeURIComponent(str)));
     } catch (e) { return ""; }
 }
+
 /** Przy wylogowaniu użytkownika z mobile: usuwa go z active_sessions i dopisuje wpis do audit_log (zapis na GitHub). */
 function syncLogoutToGitHub(userName) {
     var token = getGitHubToken();
@@ -267,6 +325,7 @@ function syncLogoutToGitHub(userName) {
         });
     }).catch(function () { });
 }
+
 function doLogout() {
     var userName = "";
     try { userName = localStorage.getItem(SYS_AUTH_2FA_STORAGE) || ""; } catch (e) { }
@@ -299,59 +358,6 @@ function normaliseGroups(sett) {
     });
     sett.groups = g;
 }
-
-// --- STATE ---
-let scheduleData = null;
-/** Tablica miesięcy: [{ meta, workers }, ...]. Dla jednego miesiąca z JSON: [sched]. */
-let scheduleMonths = [];
-/** Indeks aktualnie wyświetlanego miesiąca (0 = pierwszy). */
-let currentMonthIndex = 0;
-let currentDayIndex = 0;
-let currentView = "daily"; // 'daily' | 'individual'
-
-// --- ELEMENTS ---
-const loader = document.getElementById("loader");
-const themeIcon = document.getElementById("theme-icon");
-const resetDayBtn = document.querySelector(".reset-day-btn");
-
-// Views
-const viewDaily = document.getElementById("view-daily");
-const viewIndividual = document.getElementById("view-individual");
-const controlsDaily = document.getElementById("controls-daily");
-const controlsIndividual = document.getElementById("controls-individual");
-const btnViewDaily = document.getElementById("btn-view-daily");
-const btnViewIndividual = document.getElementById("btn-view-individual");
-
-// Individual Components
-const workerSelectDisplay = document.getElementById("worker-select-display");
-const workerSelectDropdown = document.getElementById("worker-select-dropdown");
-const workerSelectOverlay = document.getElementById("worker-select-overlay");
-const workerSelectWrapper = document.querySelector(".custom-select-wrapper");
-const individualList = document.getElementById("individual-list");
-let selectedWorkerId = null;
-
-// Daily Components
-const list1 = document.getElementById("list-1");
-const listP1 = document.getElementById("list-p1");
-const containerP1 = document.getElementById("container-p1");
-
-const list2 = document.getElementById("list-2");
-const listP2 = document.getElementById("list-p2");
-const containerP2 = document.getElementById("container-p2");
-
-const listOther = document.getElementById("list-other");
-const listAbsent = document.getElementById("list-absent");
-
-const labelDate = document.getElementById("current-date-display");
-const labelName = document.getElementById("current-day-name");
-const labelMonth = document.getElementById("month-label");
-
-const count1El = document.getElementById("count-1");
-const count2El = document.getElementById("count-2");
-const countOtherEl = document.getElementById("count-other");
-const countAbsentEl = document.getElementById("count-absent");
-
-const dayOffsetMap = { PN: 0, WT: 1, ŚR: 2, CZ: 3, PT: 4, SO: 5, ND: 6 };
 
 /** Do wyświetlania: usuwa "(8)" z końca kodu (np. 2(8) → 2, P2(8) → P2). */
 function displayShiftCode(code) {
@@ -477,7 +483,7 @@ function switchView(viewName) {
 }
 
 function populateWorkerSelect() {
-    if (!scheduleData) return;
+    if (!scheduleData || !scheduleData.workers) return;
 
     const sortedWorkers = [...scheduleData.workers].sort(
         (a, b) => parseInt(a.id) - parseInt(b.id),
@@ -559,14 +565,14 @@ function selectWorker(workerId, workerName, groupBadge) {
 
 /** Podgląd na pracownika – wyświetla tylko dane z aktualnie wybranego miesiąca (scheduleData). */
 function renderIndividualSchedule() {
-    if (!selectedWorkerId || !scheduleData) return;
+    if (!selectedWorkerId || !scheduleData || !scheduleData.meta || !scheduleData.meta.days || !scheduleData.workers) return;
 
     const worker = scheduleData.workers.find((w) => w.id == selectedWorkerId);
     if (!worker) return;
 
     individualList.innerHTML = "";
     const days = scheduleData.meta.days;
-    const weekdays = scheduleData.meta.weekdays;
+    const weekdays = scheduleData.meta.weekdays || [];
     const monthLabel = (scheduleData.meta && scheduleData.meta.month) ? scheduleData.meta.month : "";
 
     /* Tylko zmiany dla tego miesiąca – luty 28, marzec 31; bez „dobijania” do 31. */
@@ -694,9 +700,7 @@ function renderIndividualSchedule() {
     });
 
     // GRID OFFSET
-    // Assume meta.weekdays[0] corresponds to meta.days[0].
-    // Find which day of the week the first day is.
-    const firstDayWeekName = weekdays[0];
+    const firstDayWeekName = weekdays[0] || "PN";
     const offset = dayOffsetMap[firstDayWeekName] || 0;
 
     for (let i = 0; i < offset; i++) {
@@ -709,7 +713,7 @@ function renderIndividualSchedule() {
     const today = new Date().getDate().toString();
     days.forEach((dayNum, index) => {
         const shiftCode = shiftsForMonth[index];
-        const weekday = weekdays[index];
+        const weekday = weekdays[index] || "";
 
         const row = document.createElement("div");
         row.className = "individual-row";
@@ -748,18 +752,7 @@ function getShiftType(shiftCode) {
     if (!shiftCode || shiftCode === "" || shiftCode === "-") return "ABSENT";
     const code = shiftCode.toUpperCase();
     const absentCodes = [
-        "X",
-        "U",
-        "ZW",
-        "L4",
-        "OPIEKA",
-        "UW",
-        "W",
-        "NN",
-        "CH",
-        "WYP",
-        "SZKOLENIE",
-        "URLOP",
+        "X", "U", "ZW", "L4", "OPIEKA", "UW", "W", "NN", "CH", "WYP", "SZKOLENIE", "URLOP",
     ];
     if (absentCodes.includes(code)) return "ABSENT";
     if (code === "P1" || code === "NP1") return "SHIFT_P1";
@@ -781,20 +774,7 @@ function createWorkerCard(worker, shiftCode, dayIndex) {
     else if (sc.includes("1")) badgeClass += " badge-shift-1";
     else if (sc.includes("2")) badgeClass += " badge-shift-2";
     else if (
-        [
-            "X",
-            "U",
-            "ZW",
-            "L4",
-            "OPIEKA",
-            "UW",
-            "W",
-            "NN",
-            "CH",
-            "WYP",
-            "SZKOLENIE",
-            "URLOP",
-        ].includes(sc)
+        ["X", "U", "ZW", "L4", "OPIEKA", "UW", "W", "NN", "CH", "WYP", "SZKOLENIE", "URLOP"].includes(sc)
     )
         badgeClass += " badge-absent";
     else badgeClass += " style-shift-other";
@@ -807,10 +787,7 @@ function createWorkerCard(worker, shiftCode, dayIndex) {
                 <div class="flex items-center gap-2">
                     <div class="avatar avatar-wrapper">
                         ${worker.name.charAt(0)}
-                        ${groupBadge
-            ? `<div class="badge-wrapper">${groupBadge}</div>`
-            : ""
-        }
+                        ${groupBadge ? `<div class="badge-wrapper">${groupBadge}</div>` : ""}
                     </div>
                     <span class="worker-name">${worker.name}</span>
                 </div>
@@ -828,7 +805,22 @@ function createWorkerCard(worker, shiftCode, dayIndex) {
 }
 
 function renderSchedule() {
-    if (!scheduleData) return;
+    // SAFEGUARD NA PUSTE OBIEKTY
+    if (!scheduleData || !scheduleData.meta || !scheduleData.meta.days || !scheduleData.meta.weekdays || !scheduleData.workers) {
+        if (labelDate) labelDate.innerText = "Brak";
+        if (labelName) labelName.innerText = "Danych";
+        if (list1) list1.innerHTML = "<div class='empty-message'>Brak Danych / Czekam na plik JSON</div>";
+        if (list2) list2.innerHTML = "<div class='empty-message'>Brak Danych / Czekam na plik JSON</div>";
+        if (listP1) listP1.innerHTML = "";
+        if (listP2) listP2.innerHTML = "";
+        if (listOther) listOther.innerHTML = "";
+        if (listAbsent) listAbsent.innerHTML = "";
+        if (count1El) count1El.innerText = "0";
+        if (count2El) count2El.innerText = "0";
+        if (countOtherEl) countOtherEl.innerText = "0";
+        if (countAbsentEl) countAbsentEl.innerText = "0";
+        return;
+    }
 
     const dayNumber = scheduleData.meta.days[currentDayIndex];
     const dayName = scheduleData.meta.weekdays[currentDayIndex];
@@ -885,7 +877,6 @@ function renderSchedule() {
                 cO++;
                 break;
             case "ABSENT":
-                // Special rendering for absent list to match your style
                 const groupInfo = getWorkerGroupInfo(worker);
                 const groupBadge = groupInfo.badgeHtml || "";
 
@@ -895,10 +886,7 @@ function renderSchedule() {
                           <div class="flex items-center gap-2">
                             <div class="avatar avatar-wrapper">
                               ${worker.name.charAt(0)}
-                              ${groupBadge
-                        ? `<div class="badge-wrapper">${groupBadge}</div>`
-                        : ""
-                    }
+                              ${groupBadge ? `<div class="badge-wrapper">${groupBadge}</div>` : ""}
                             </div>
                             <span class="worker-name">${worker.name}</span>
                           </div>
@@ -937,19 +925,13 @@ function renderSchedule() {
 
 function getFullDayName(short) {
     const map = {
-        PN: "PONIEDZIAŁEK",
-        WT: "WTOREK",
-        ŚR: "ŚRODA",
-        CZ: "CZWARTEK",
-        PT: "PIĄTEK",
-        SO: "SOBOTA",
-        ND: "NIEDZIELA",
+        PN: "PONIEDZIAŁEK", WT: "WTOREK", SR: "ŚRODA", ŚR: "ŚRODA", CZ: "CZWARTEK", PT: "PIĄTEK", SO: "SOBOTA", ND: "NIEDZIELA",
     };
     return map[short] || short;
 }
 
 function changeDay(delta) {
-    if (!scheduleData) return;
+    if (!scheduleData || !scheduleData.meta || !scheduleData.meta.days) return;
     const max = scheduleData.meta.days.length - 1;
     let newIndex = currentDayIndex + delta;
     if (newIndex < 0) newIndex = 0;
@@ -997,7 +979,6 @@ function setMonthByIndex(idx) {
     }
     currentMonthIndex = target;
     scheduleData = scheduleMonths[currentMonthIndex];
-    /* Przy zmianie miesiąca zawsze pokazuj 1. dzień – luty ma 28 dni, marzec 31; unikamy „dobijania” indeksu do 31. */
     currentDayIndex = 0;
     if (selectedWorkerId && !(scheduleData.workers && scheduleData.workers.some((w) => w.id == selectedWorkerId))) {
         selectedWorkerId = null;
@@ -1105,10 +1086,10 @@ function goToToday() {
     const todayDay = now.getDate().toString();
     const currentMonthName = MONTH_NAMES_PL[now.getMonth()];
 
-    /* Najpierw szukaj miesiąca po nazwie (LUTY, MARZEC), żeby 1 marca nie lądował w lutym. */
     for (let m = 0; m < scheduleMonths.length; m++) {
         const meta = scheduleMonths[m].meta;
-        const monthName = (meta && meta.month) ? String(meta.month).trim().toUpperCase() : "";
+        if (!meta) continue;
+        const monthName = (meta.month) ? String(meta.month).trim().toUpperCase() : "";
         if (monthName !== currentMonthName) continue;
         const days = meta.days;
         if (!Array.isArray(days)) continue;
@@ -1124,7 +1105,6 @@ function goToToday() {
             if (currentView === "individual" && selectedWorkerId) renderIndividualSchedule();
             return;
         }
-        /* Jest miesiąc, ale brak dnia (np. 31 w lutym) – weź 1. dzień. */
         currentMonthIndex = m;
         scheduleData = scheduleMonths[m];
         currentDayIndex = 0;
@@ -1136,23 +1116,27 @@ function goToToday() {
         return;
     }
 
-    /* Fallback: brak dopasowania po nazwie (np. inna pisownia), szukaj po dniu – ostatni pasujący miesiąc. */
     let lastMatch = -1;
     for (let m = 0; m < scheduleMonths.length; m++) {
-        const days = scheduleMonths[m].meta && scheduleMonths[m].meta.days;
+        if (!scheduleMonths[m].meta) continue;
+        const days = scheduleMonths[m].meta.days;
         if (!Array.isArray(days)) continue;
         const idx = days.findIndex((d) => d == todayDay);
         if (idx !== -1) lastMatch = m;
     }
     if (lastMatch !== -1) {
-        const days = scheduleMonths[lastMatch].meta.days;
-        const idx = days.findIndex((d) => d == todayDay);
         currentMonthIndex = lastMatch;
         scheduleData = scheduleMonths[lastMatch];
-        currentDayIndex = idx;
+        currentDayIndex = scheduleMonths[lastMatch].meta.days.findIndex((d) => d == todayDay);
     } else {
         currentMonthIndex = 0;
-        scheduleData = scheduleMonths[0];
+        for (let i = 0; i < scheduleMonths.length; i++) {
+            if (hasMonthData(scheduleMonths[i])) {
+                currentMonthIndex = i;
+                break;
+            }
+        }
+        scheduleData = scheduleMonths.length > 0 ? scheduleMonths[currentMonthIndex] : null;
         currentDayIndex = 0;
     }
     updateMonthSwitcher();
@@ -1163,7 +1147,7 @@ function goToToday() {
 }
 
 function updateResetDayButton() {
-    if (!scheduleData || !resetDayBtn) return;
+    if (!scheduleData || !scheduleData.meta || !scheduleData.meta.days || !resetDayBtn) return;
     const today = new Date().getDate().toString();
     const todayIndex = scheduleData.meta.days.findIndex((d) => d == today);
     const notOnToday = todayIndex !== -1 && currentDayIndex !== todayIndex;
@@ -1202,15 +1186,13 @@ function toggleTheme() {
 
 function updateThemeIcon(theme) {
     if (theme === "dark") {
-        themeIcon.src =
-            "https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png";
+        themeIcon.src = "https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png";
         themeIcon.style.filter = "brightness(1) invert(0)";
     } else {
-        themeIcon.src =
-            "https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png";
+        themeIcon.src = "https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png";
         themeIcon.style.filter = "brightness(0.7) invert(0)";
     }
-    lucide.createIcons();
+    if (typeof lucide !== "undefined") lucide.createIcons();
 }
 
 // --- DATA LOADING ---
@@ -1258,14 +1240,18 @@ function loadData() {
         .then(([schedData, settData]) => {
             settingsData = settData || { groups: [] };
             normaliseGroups(settingsData);
-            // Obsługa JSON: pojedynczy miesiąc { meta, workers } lub wiele miesięcy { months: [ { meta, workers }, ... ] }
-            if (schedData && Array.isArray(schedData.months) && schedData.months.length > 0) {
-                scheduleMonths = schedData.months;
+
+            // --- GŁÓWNY FIX ZAPOBIEGAJĄCY PUSTEMU EKRANOWI ---
+            if (Array.isArray(schedData)) {
+                scheduleMonths = schedData.filter(m => m && typeof m === 'object');
+            } else if (schedData && Array.isArray(schedData.months) && schedData.months.length > 0) {
+                scheduleMonths = schedData.months.filter(m => m && typeof m === 'object');
             } else if (schedData && schedData.meta && Array.isArray(schedData.workers)) {
                 scheduleMonths = [schedData];
             } else {
                 scheduleMonths = [];
             }
+
             currentMonthIndex = 0;
             for (let i = 0; i < scheduleMonths.length; i++) {
                 if (hasMonthData(scheduleMonths[i])) {
@@ -1274,8 +1260,10 @@ function loadData() {
                 }
             }
             scheduleData = scheduleMonths.length > 0 ? scheduleMonths[currentMonthIndex] : null;
-            checkScheduleUpdate(schedData, scheduleMonths);
+
+            checkScheduleUpdate(scheduleData, scheduleMonths);
             console.log("[SYS] DANE ZAŁADOWANE POMYŚLNIE." + (scheduleMonths.length > 1 ? " Miesięcy: " + scheduleMonths.length : ""));
+
             loader.classList.add("hidden");
             viewDaily.classList.remove("hidden");
             populateWorkerSelect();
@@ -1290,13 +1278,18 @@ function loadData() {
                 return fetch(URL_SCHEDULE_MAIN + "?t=" + Date.now())
                     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
                     .then((schedData) => {
-                        if (schedData && Array.isArray(schedData.months) && schedData.months.length > 0) {
-                            scheduleMonths = schedData.months;
+
+                        // --- FIX DLA ZAPASOWEGO ŁADOWANIA (FALLBACK) ---
+                        if (Array.isArray(schedData)) {
+                            scheduleMonths = schedData.filter(m => m && typeof m === 'object');
+                        } else if (schedData && Array.isArray(schedData.months) && schedData.months.length > 0) {
+                            scheduleMonths = schedData.months.filter(m => m && typeof m === 'object');
                         } else if (schedData && schedData.meta && Array.isArray(schedData.workers)) {
                             scheduleMonths = [schedData];
                         } else {
                             scheduleMonths = [];
                         }
+
                         settingsData = { groups: [] };
                         currentMonthIndex = 0;
                         for (let i = 0; i < scheduleMonths.length; i++) {
@@ -1306,8 +1299,10 @@ function loadData() {
                             }
                         }
                         scheduleData = scheduleMonths.length > 0 ? scheduleMonths[currentMonthIndex] : null;
-                        checkScheduleUpdate(schedData, scheduleMonths);
+
+                        checkScheduleUpdate(scheduleData, scheduleMonths);
                         console.log("[SYS] Załadowano grafik testowy. Miesięcy: " + scheduleMonths.length);
+
                         loader.classList.add("hidden");
                         viewDaily.classList.remove("hidden");
                         populateWorkerSelect();
@@ -1317,11 +1312,13 @@ function loadData() {
                     })
                     .catch((err2) => {
                         console.error("[SYS] Fallback też nie zadziałał:", err2);
-                        loader.innerHTML = "<div class=\"error-view\"><section class=\"error-section\"><p class=\"error-title\">Błąd ładowania grafiku</p><p style=\"margin:1rem 0;font-size:0.9rem;\">Nie udało się pobrać danych. Aby zobaczyć grafik testowy (3 miesiące), otwórz stronę z parametrem <strong>?test</strong>:</p><p style=\"margin:0.5rem 0;\"><a href=\"?test\" style=\"color:var(--highlight-color);\">" + window.location.pathname.split("/").pop() + "?test</a></p><button onclick=\"location.reload()\" class=\"btn btn-primary\" style=\"margin-top:1rem;\">Odśwież</button></section></div>";
-                        lucide.createIcons();
+                        loader.innerHTML = "<div class=\"error-view\"><section class=\"error-section\"><p class=\"error-title\">Błąd ładowania grafiku</p><p style=\"margin:1rem 0;font-size:0.9rem;\">Nie udało się pobrać danych. Aby zobaczyć grafik testowy (3 miesiące), otwórz stronę z parametrem <strong>?test</strong>:</p><p style=\"margin:0.5rem 0;\"><a href=\"?test\" style=\"color:var(--highlight-color);\">" + window.location.pathname.split("/").pop() + "?test</a></p><button onclick=\"location.reload()\" class=\"btn btn-primary\" style=\"margin-top:1rem; border-radius: 0;\">Odśwież</button></section></div>";
+                        if (typeof lucide !== "undefined") lucide.createIcons();
                     });
                 return;
             }
+
+            // RENDERING EKRANU KRYTYCZNEGO BŁĘDU JSON'a LUB SIECI
             loader.innerHTML = `
                         <div class="error-view">
                             <section class="error-section error-section-header">
@@ -1331,12 +1328,12 @@ function loadData() {
                             <section class="error-section error-section-status">
                                 <div class="error-status-container">
                                     <p class="error-status"><i data-lucide="construction" class="error-status-icon"></i></p>
-                                    <p class="error-status-text"><span>STATUS:</span> TRWA MODERNIZACJA...</p>
+                                    <p class="error-status-text"><span>STATUS:</span> BŁĄD ODCZYTU PLIKU JSON LUB SIECI</p>
                                 </div>
                             </section>
                             <section class="error-section error-section-message">
                                 <div class="error-info-package">
-                                    <div class="error-info-package-title"><i data-lucide="package" class="error-info-icon"></i> Pakiet informacji</div>
+                                    <div class="error-info-package-title"><i data-lucide="package" class="error-info-icon"></i> Szczegóły awarii</div>
                                     <dl class="error-info-list">
                                         <div class="error-info-row">
                                             <dt class="error-info-label">Błąd</dt>
@@ -1347,18 +1344,6 @@ function loadData() {
                                             <dd class="error-info-value">${escapeHtml(err.name || 'Nieznany')}</dd>
                                         </div>
                                         <div class="error-info-row">
-                                            <dt class="error-info-label">Źródło</dt>
-                                            <dd class="error-info-value">Pobieranie danych z GitHub</dd>
-                                        </div>
-                                        <div class="error-info-row">
-                                            <dt class="error-info-label">Repo</dt>
-                                            <dd class="error-info-value">---------.json</dd>
-                                        </div>
-                                        <div class="error-info-row">
-                                            <dt class="error-info-label">Pliki</dt>
-                                            <dd class="error-info-value">---------.json</dd>
-                                        </div>
-                                        <div class="error-info-row">
                                             <dt class="error-info-label">Czas</dt>
                                             <dd class="error-info-value">${new Date().toLocaleString('pl-PL')}</dd>
                                         </div>
@@ -1366,28 +1351,20 @@ function loadData() {
                                 </div>
                                 <div class="error-webhooks-block">
                                     <div class="error-webhooks-title"><i data-lucide="webhook" class="error-info-icon"></i> Status</div>
-                                    <p class="error-webhooks-desc">System nie może pobrać danych z repozytorium GitHub. Sprawdź połączenie sieciowe lub skontaktuj się z administratorem systemu.</p>
-                                    <div class="error-contact-admin">
-                                        <div class="error-contact-admin-icon"><i data-lucide="help-circle"></i></div>
-                                        <div class="error-contact-admin-text">
-                                            <span class="error-contact-admin-label">Kontakt z administratorem</span>
-                                            <span class="error-contact-admin-hint">W razie problemów skontaktuj się z administratorem systemu</span>
-                                        </div>
-                                    </div>
+                                    <p class="error-webhooks-desc">System OXY_OS nie może pobrać poprawnej tablicy danych JSON. Upewnij się, że użyto poprawnego wariantu nawiasów: "[ {..}, {...} ]"</p>
                                 </div>
                             </section>
                             <section class="error-section error-section-action">
-                                <button onclick="showLogoutConfirmModal()" class="footer-btn error-btn">RESTART SYSTEMU</button>
+                                <button onclick="location.reload()" class="footer-btn error-btn" style="border-radius: 0;">RESTART SYSTEMU</button>
                             </section>
                         </div>
                     `;
-            lucide.createIcons();
+            if (typeof lucide !== "undefined") lucide.createIcons();
         });
 
     doFetch();
 }
 
-// Modal wylogowania – delegacja (otwarcie + zamknięcie), działa też z GitHub Pages / iframe
 window.showLogoutConfirmModal = showLogoutConfirmModal;
 window.closeLogoutConfirmModal = closeLogoutConfirmModal;
 
@@ -1412,7 +1389,6 @@ document.addEventListener("click", function (e) {
     }
 }, false);
 
-/** Uruchamia fn gdy DOM gotowy; działa też po osadzeniu (iframe), gdy DOMContentLoaded już minął. */
 function whenReady(fn) {
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", fn);
@@ -1422,14 +1398,12 @@ function whenReady(fn) {
 }
 
 whenReady(function () {
-    /* Brak możliwości cofania (przycisk Wstecz). */
     (function () {
         if (typeof history === "undefined" || !history.pushState) return;
         history.pushState(null, "", location.href);
         window.addEventListener("popstate", function () { history.pushState(null, "", location.href); });
     })();
 
-    /* Wymagana sesja z logowanie.html (SYS.AUTH 2FA). */
     try {
         if (!localStorage.getItem(SYS_AUTH_2FA_STORAGE)) {
             window.location.href = LOGIN_PAGE_URL + "?return=mobile";
@@ -1440,7 +1414,6 @@ whenReady(function () {
         return;
     }
 
-    /* Tryb aktualizacji (ustawiony w panelu admin): przekieruj na aktualizacja.html. Dla admina nie stosować. */
     function checkMaintenanceAndRedirect(cbIfOk) {
         fetch(URL_MAINTENANCE + "?t=" + Date.now())
             .then(function (r) { return r.ok ? r.json() : null; })
@@ -1467,7 +1440,6 @@ whenReady(function () {
 function runMobileInit() {
     initTheme();
     checkAccessStillValid();
-    /* Panel admina tylko dla Robertsa. */
     (function () {
         var el = document.getElementById("link-admin-panel");
         if (!el) return;
@@ -1478,6 +1450,8 @@ function runMobileInit() {
         else el.classList.add("hidden");
     })();
     if (typeof lucide !== "undefined" && lucide.createIcons) lucide.createIcons();
+
+    // Uruchamiamy pobieranie danych na koniec
     loadData();
 
     var dateDisplayWrap = document.getElementById("date-display-wrap");
@@ -1490,6 +1464,7 @@ function runMobileInit() {
             if ((e.key === "Enter" || e.key === " ") && scheduleMonths.length > 1) { e.preventDefault(); toggleMonthsDropdown(); }
         });
     }
+
     document.addEventListener("click", function (e) {
         if (!e.target.closest("#date-display-wrap")) closeMonthsDropdown();
         if (!e.target.closest(".custom-select-wrapper") && !e.target.closest("#worker-select-overlay") && workerSelectDropdown && !workerSelectDropdown.classList.contains("hidden")) {
@@ -1506,10 +1481,9 @@ function runMobileInit() {
 
     var individualMonthPrev = document.getElementById("individual-month-prev");
     var individualMonthNext = document.getElementById("individual-month-next");
-    if (individualMonthPrev) individualMonthPrev.addEventListener("click", function () { changeMonth(-1); lucide.createIcons(); });
-    if (individualMonthNext) individualMonthNext.addEventListener("click", function () { changeMonth(1); lucide.createIcons(); });
+    if (individualMonthPrev) individualMonthPrev.addEventListener("click", function () { changeMonth(-1); if (typeof lucide !== "undefined") lucide.createIcons(); });
+    if (individualMonthNext) individualMonthNext.addEventListener("click", function () { changeMonth(1); if (typeof lucide !== "undefined") lucide.createIcons(); });
 
-    /** Po powrocie do zakładki: sprawdź dostęp i tryb aktualizacji; potem ustaw dzisiejszy dzień. */
     document.addEventListener("visibilitychange", function () {
         if (document.visibilityState !== "visible") return;
         if (typeof window._checkMaintenanceAndRedirect === "function")
@@ -1521,7 +1495,6 @@ function runMobileInit() {
         }
     });
 
-    /** Okresowa weryfikacja dostępu i trybu aktualizacji (co 20 s). */
     setInterval(checkAccessStillValid, 20 * 1000);
     setInterval(function () {
         if (typeof window._checkMaintenanceAndRedirect === "function")
@@ -1530,24 +1503,20 @@ function runMobileInit() {
 }
 
 whenReady(function () {
-    // Remove draggable attribute from all elements
     document.querySelectorAll('[draggable="true"]').forEach((el) => {
         el.removeAttribute("draggable");
     });
 
-    // Prevent dragstart event
     document.addEventListener("dragstart", function (e) {
         e.preventDefault();
         return false;
     });
 
-    // Prevent drop event
     document.addEventListener("drop", function (e) {
         e.preventDefault();
         return false;
     });
 
-    // Prevent dragover event
     document.addEventListener("dragover", function (e) {
         e.preventDefault();
         return false;

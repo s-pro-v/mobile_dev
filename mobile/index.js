@@ -45,8 +45,7 @@ const STATE_FILE_PATH = "dev/sys_state.json";
 const URL_STATE = "https://raw.githubusercontent.com/" + GITHUB_USER + "/" + GITHUB_REPO + "/refs/heads/main/" + STATE_FILE_PATH;
 /** URL API GitHub do odczytu/zapisu pliku stanu (wylogowanie z mobile → aktualizacja active_sessions). */
 const GITHUB_API_STATE = "https://api.github.com/repos/" + GITHUB_USER + "/" + GITHUB_REPO + "/contents/" + STATE_FILE_PATH;
-/** Klucz tokenu w localStorage (ten sam co w admin / logowanie) – do zapisu wylogowania w JSON. */
-/** Ten sam klucz API co logowanie i admin – wspólny dla całego systemu. */
+/** Klucz tokenu w localStorage (ten sam co w admin / logowanie) – do zapis wylogowania w JSON. */
 const GITHUB_PAT_STORAGE = "sys_auth_github_pat";
 /** Nazwa admina – link do panelu admina widoczny tylko dla tego użytkownika (zgodnie z logowanie/admin). Zakodowane. */
 const ADMIN_DISPLAY_NAME = (function () { try { return atob("Um9iZXJ0cw=="); } catch (e) { return ""; } })();
@@ -137,8 +136,8 @@ function updateHeaderActiveKey() {
                 if (userName && userName.trim()) {
                     window._lastKnownUserName = userName;
                     let badge = window._isLoggedOutByAdmin
-                        ? "<span style='color: var(--danger-color, #dc3545); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 4px; background: rgba(220, 53, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Wylogowany</span>"
-                        : "<span style='color: var(--success-color, #28a745); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 4px; background: rgba(40, 167, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Aktywny</span>";
+                        ? "<span style='color: var(--danger-color, #dc3545); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 0; background: rgba(220, 53, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Wylogowany</span>"
+                        : "<span style='color: var(--success-color, #28a745); font-weight: bold; font-size: 0.8em; margin-left: 5px; padding: 2px 6px; border-radius: 0; background: rgba(40, 167, 69, 0.1);'><i class='fas fa-circle' style='font-size:0.6em; vertical-align:middle; margin-right:3px;'></i>Aktywny</span>";
 
                     label = "Zalogowany: " + escapeHtml(first3Letters(userName)) + badge;
                 }
@@ -177,7 +176,7 @@ function formatUpdateDate(str) {
  * Pobiera datę z JSON (root date lub meta.date / meta.generated). Ustawia headerUpdateLabel na datę
  * i headerUpdateIsNew = true tylko przy pierwszym wejściu z nowymi danymi (potem zapis w localStorage).
  * @param {object} schedData - surowa odpowiedź (mobile-grafik.json), może mieć pole date
- * @param {Array} scheduleMonths - tablica miesięcy; meta.date / meta.generated brane z drugiego miesiąca (indeks 1), lub z pierwszego gdy jest tylko jeden
+ * @param {Array} scheduleMonths - tablica miesięcy; meta.date / meta.generated brane z drugiego miasta (indeks 1), lub z pierwszego gdy jest tylko jeden
  */
 function checkScheduleUpdate(schedData, scheduleMonths) {
     const list = Array.isArray(scheduleMonths) ? scheduleMonths : (scheduleMonths ? [scheduleMonths] : []);
@@ -694,8 +693,6 @@ function renderIndividualSchedule() {
     });
 
     // GRID OFFSET
-    // Assume meta.weekdays[0] corresponds to meta.days[0].
-    // Find which day of the week the first day is.
     const firstDayWeekName = weekdays[0];
     const offset = dayOffsetMap[firstDayWeekName] || 0;
 
@@ -885,7 +882,6 @@ function renderSchedule() {
                 cO++;
                 break;
             case "ABSENT":
-                // Special rendering for absent list to match your style
                 const groupInfo = getWorkerGroupInfo(worker);
                 const groupBadge = groupInfo.badgeHtml || "";
 
@@ -998,7 +994,6 @@ function setMonthByIndex(idx) {
     }
     currentMonthIndex = target;
     scheduleData = scheduleMonths[currentMonthIndex];
-    /* Przy zmianie miesiąca zawsze pokazuj 1. dzień – luty ma 28 dni, marzec 31; unikamy „dobijania” indeksu do 31. */
     currentDayIndex = 0;
     if (selectedWorkerId && !(scheduleData.workers && scheduleData.workers.some((w) => w.id == selectedWorkerId))) {
         selectedWorkerId = null;
@@ -1106,7 +1101,6 @@ function goToToday() {
     const todayDay = now.getDate().toString();
     const currentMonthName = MONTH_NAMES_PL[now.getMonth()];
 
-    /* Najpierw szukaj miesiąca po nazwie (LUTY, MARZEC), żeby 1 marca nie lądował w lutym. */
     for (let m = 0; m < scheduleMonths.length; m++) {
         const meta = scheduleMonths[m].meta;
         const monthName = (meta && meta.month) ? String(meta.month).trim().toUpperCase() : "";
@@ -1125,7 +1119,6 @@ function goToToday() {
             if (currentView === "individual" && selectedWorkerId) renderIndividualSchedule();
             return;
         }
-        /* Jest miesiąc, ale brak dnia (np. 31 w lutym) – weź 1. dzień. */
         currentMonthIndex = m;
         scheduleData = scheduleMonths[m];
         currentDayIndex = 0;
@@ -1137,7 +1130,6 @@ function goToToday() {
         return;
     }
 
-    /* Fallback: brak dopasowania po nazwie (np. inna pisownia), szukaj po dniu – ostatni pasujący miesiąc. */
     let lastMatch = -1;
     for (let m = 0; m < scheduleMonths.length; m++) {
         const days = scheduleMonths[m].meta && scheduleMonths[m].meta.days;
@@ -1203,12 +1195,10 @@ function toggleTheme() {
 
 function updateThemeIcon(theme) {
     if (theme === "dark") {
-        themeIcon.src =
-            "https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png";
+        themeIcon.src = "https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png";
         themeIcon.style.filter = "brightness(1) invert(0)";
     } else {
-        themeIcon.src =
-            "https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png";
+        themeIcon.src = "https://raw.githubusercontent.com/skokivPr/img/refs/heads/main/grafik/light.png";
         themeIcon.style.filter = "brightness(0.7) invert(0)";
     }
     lucide.createIcons();
@@ -1259,14 +1249,18 @@ function loadData() {
         .then(([schedData, settData]) => {
             settingsData = settData || { groups: [] };
             normaliseGroups(settingsData);
-            // Obsługa JSON: pojedynczy miesiąc { meta, workers } lub wiele miesięcy { months: [ { meta, workers }, ... ] }
-            if (schedData && Array.isArray(schedData.months) && schedData.months.length > 0) {
+
+            // --- POPRAWIONA WALIDACJA STRUKTURY DANYCH DLA DWÓCH MIESIĘCY ---
+            if (Array.isArray(schedData)) {
+                scheduleMonths = schedData;
+            } else if (schedData && Array.isArray(schedData.months) && schedData.months.length > 0) {
                 scheduleMonths = schedData.months;
             } else if (schedData && schedData.meta && Array.isArray(schedData.workers)) {
                 scheduleMonths = [schedData];
             } else {
                 scheduleMonths = [];
             }
+
             currentMonthIndex = 0;
             for (let i = 0; i < scheduleMonths.length; i++) {
                 if (hasMonthData(scheduleMonths[i])) {
@@ -1291,13 +1285,18 @@ function loadData() {
                 return fetch(URL_SCHEDULE_MAIN)
                     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
                     .then((schedData) => {
-                        if (schedData && Array.isArray(schedData.months) && schedData.months.length > 0) {
+
+                        // --- POPRAWIONA WALIDACJA W SEKCJI FALLBACK ---
+                        if (Array.isArray(schedData)) {
+                            scheduleMonths = schedData;
+                        } else if (schedData && Array.isArray(schedData.months) && schedData.months.length > 0) {
                             scheduleMonths = schedData.months;
                         } else if (schedData && schedData.meta && Array.isArray(schedData.workers)) {
                             scheduleMonths = [schedData];
                         } else {
                             scheduleMonths = [];
                         }
+
                         settingsData = { groups: [] };
                         currentMonthIndex = 0;
                         for (let i = 0; i < scheduleMonths.length; i++) {
@@ -1384,11 +1383,8 @@ function loadData() {
                     `;
             lucide.createIcons();
         });
-
-    doFetch();
 }
 
-// Modal wylogowania – delegacja (otwarcie + zamknięcie), działa też z GitHub Pages / iframe
 window.showLogoutConfirmModal = showLogoutConfirmModal;
 window.closeLogoutConfirmModal = closeLogoutConfirmModal;
 
@@ -1413,7 +1409,6 @@ document.addEventListener("click", function (e) {
     }
 }, false);
 
-/** Uruchamia fn gdy DOM gotowy; działa też po osadzeniu (iframe), gdy DOMContentLoaded już minął. */
 function whenReady(fn) {
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", fn);
@@ -1423,14 +1418,12 @@ function whenReady(fn) {
 }
 
 whenReady(function () {
-    /* Brak możliwości cofania (przycisk Wstecz). */
     (function () {
         if (typeof history === "undefined" || !history.pushState) return;
         history.pushState(null, "", location.href);
         window.addEventListener("popstate", function () { history.pushState(null, "", location.href); });
     })();
 
-    /* Wymagana sesja z logowanie.html (SYS.AUTH 2FA). */
     try {
         if (!localStorage.getItem(SYS_AUTH_2FA_STORAGE)) {
             window.location.href = LOGIN_PAGE_URL + "?return=mobile";
@@ -1441,7 +1434,6 @@ whenReady(function () {
         return;
     }
 
-    /* Tryb aktualizacji (ustawiony w panelu admin): przekieruj na aktualizacja.html. Dla admina nie stosować. */
     function checkMaintenanceAndRedirect(cbIfOk) {
         fetch(URL_MAINTENANCE + "?t=" + Date.now())
             .then(function (r) { return r.ok ? r.json() : null; })
@@ -1468,7 +1460,6 @@ whenReady(function () {
 function runMobileInit() {
     initTheme();
     checkAccessStillValid();
-    /* Panel admina tylko dla Robertsa. */
     (function () {
         var el = document.getElementById("link-admin-panel");
         if (!el) return;
@@ -1510,7 +1501,6 @@ function runMobileInit() {
     if (individualMonthPrev) individualMonthPrev.addEventListener("click", function () { changeMonth(-1); lucide.createIcons(); });
     if (individualMonthNext) individualMonthNext.addEventListener("click", function () { changeMonth(1); lucide.createIcons(); });
 
-    /** Po powrocie do zakładki: sprawdź dostęp i tryb aktualizacji; potem ustaw dzisiejszy dzień. */
     document.addEventListener("visibilitychange", function () {
         if (document.visibilityState !== "visible") return;
         if (typeof window._checkMaintenanceAndRedirect === "function")
@@ -1522,7 +1512,6 @@ function runMobileInit() {
         }
     });
 
-    /** Okresowa weryfikacja dostępu i trybu aktualizacji (co 20 s). */
     setInterval(checkAccessStillValid, 20 * 1000);
     setInterval(function () {
         if (typeof window._checkMaintenanceAndRedirect === "function")
@@ -1531,24 +1520,20 @@ function runMobileInit() {
 }
 
 whenReady(function () {
-    // Remove draggable attribute from all elements
     document.querySelectorAll('[draggable="true"]').forEach((el) => {
         el.removeAttribute("draggable");
     });
 
-    // Prevent dragstart event
     document.addEventListener("dragstart", function (e) {
         e.preventDefault();
         return false;
     });
 
-    // Prevent drop event
     document.addEventListener("drop", function (e) {
         e.preventDefault();
         return false;
     });
 
-    // Prevent dragover event
     document.addEventListener("dragover", function (e) {
         e.preventDefault();
         return false;

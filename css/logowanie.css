@@ -551,3 +551,88 @@ body::before {
 .sys-2fa {
     color: var(--warning-color);
 }
+
+.ctrl-btn {
+    flex: 1;
+    padding: 0.35rem;
+    font-size: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+    font-family: var(--font-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    box-shadow: var(--shadow-drop);
+}
+
+.ctrl-btn:hover {
+    background-color: var(--hover-bg);
+    color: var(--text-color);
+}
+
+.ctrl-btn.active {
+    background: var(--bg-tertiary);
+    color: var(--text-color);
+    font-weight: bold;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-drop);
+}
+
+.ctrl-btn:active {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-inset);
+}
+
+.ctrl-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-inset);
+}
+
+.ctrl-btn[disabled],
+.ctrl-btn:disabled {
+    opacity: 0.45;
+    filter: grayscale(0.6);
+    cursor: not-allowed;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    box-shadow: none;
+}
+
+.sys-controls {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0.25rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-inset);
+}
+
+.sys-controls>.ctrl-btn {
+    min-width: 2.8rem;
+    min-height: 2.2rem;
+    margin: 0;
+    font-size: 0.75rem;
+    flex: 0 1 auto;
+}
+
+@media (max-width: 600px) {
+    .sys-controls {
+        gap: 0.3rem;
+        padding: 0.2rem;
+    }
+
+    .sys-controls>.ctrl-btn {
+        min-width: 2.2rem;
+        min-height: 1.8rem;
+        font-size: 0.95rem;
+    }
+}

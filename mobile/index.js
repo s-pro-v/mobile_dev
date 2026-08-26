@@ -359,12 +359,12 @@ function normaliseGroups(sett) {
     sett.groups = g;
 }
 
-/** Do wyświetlania: usuwa "(8)" z końca kodu (np. 2(8) → 2, P2(8) → P2). */
+/** Do wyświetlania: usuwa tekst w nawiasach (np. 1(D) → 1, P2(8) → P2). */
 function displayShiftCode(code) {
     if (code == null || code === "") return "-";
     const s = String(code).trim();
     if (!s) return "-";
-    return s.replace(/\s*\(8\)\s*$/i, "").trim() || s;
+    return s.replace(/\s*\(.*?\)/g, "").trim() || s;
 }
 
 // --- LOGIC HELPER: GROUP MAPPING ---
@@ -404,6 +404,15 @@ function buildWorkerPositionMap() {
  * Wywołaj z obiektem worker (id + name), żeby przy duplikatach ID każda osoba miała poprawną pozycję.
  */
 function getWorkerGroupInfo(idOrWorker) {
+    if (typeof idOrWorker === "object" && idOrWorker !== null && Array.isArray(idOrWorker.shifts)) {
+        for (let shift of idOrWorker.shifts) {
+            const extracted = extractGroupFromShiftCode(shift);
+            if (extracted) {
+                return extracted;
+            }
+        }
+    }
+
     let result = { className: "", name: "", code: "" };
 
     if (_workerPositionMapForSchedule !== scheduleData && scheduleData) buildWorkerPositionMap();
@@ -594,35 +603,19 @@ function renderIndividualSchedule() {
 
     shiftsForMonth.forEach((shift) => {
         if (!shift) return;
-        const code = shift.toUpperCase();
-        if (
-            [
-                "X",
-                "U",
-                "ZW",
-                "L4",
-                "OPIEKA",
-                "UW",
-                "W",
-                "NN",
-                "CH",
-                "WYP",
-                "SZKOLENIE",
-                "URLOP",
-            ].includes(code)
-        )
-            return;
+        const type = getShiftType(shift);
+        if (type === "ABSENT") return;
         workDays++;
-        if (code === "P1" || code === "NP1") {
+        if (type === "SHIFT_P1") {
             shiftP1Count++;
             totalHours += 12;
-        } else if (code === "P2" || code === "NP2") {
+        } else if (type === "SHIFT_P2") {
             shiftP2Count++;
             totalHours += 12;
-        } else if (code.includes("1")) {
+        } else if (type === "SHIFT_1") {
             shift1Count++;
             totalHours += 12;
-        } else if (code.includes("2")) {
+        } else if (type === "SHIFT_2") {
             shift2Count++;
             totalHours += 12;
         } else {
@@ -750,16 +743,48 @@ function renderIndividualSchedule() {
 
 function getShiftType(shiftCode) {
     if (!shiftCode || shiftCode === "" || shiftCode === "-") return "ABSENT";
-    const code = shiftCode.toUpperCase();
+    
+    const upperCode = shiftCode.toUpperCase();
+    const code = upperCode.replace(/\s*\(.*?\)/g, "").trim();
+    
     const absentCodes = [
         "X", "U", "ZW", "L4", "OPIEKA", "UW", "W", "NN", "CH", "WYP", "SZKOLENIE", "URLOP",
     ];
     if (absentCodes.includes(code)) return "ABSENT";
-    if (code === "P1" || code === "NP1") return "SHIFT_P1";
-    if (code === "P2" || code === "NP2") return "SHIFT_P2";
-    if (code.includes("1")) return "SHIFT_1";
-    if (code.includes("2")) return "SHIFT_2";
+    
+    const isPewro = upperCode.includes("(P)") || code === "P1" || code === "NP1" || code === "P2" || code === "NP2";
+    
+    if (code.includes("1")) {
+        return isPewro ? "SHIFT_P1" : "SHIFT_1";
+    }
+    if (code.includes("2")) {
+        return isPewro ? "SHIFT_P2" : "SHIFT_2";
+    }
     return "OTHER";
+}
+
+function extractGroupFromShiftCode(shiftCode) {
+    if (!shiftCode) return null;
+    const match = String(shiftCode).match(/\(([A-Z])\)/i);
+    if (match) {
+        const letter = match[1].toLowerCase();
+        const roleNames = {
+            'd': 'Dowódca',
+            's': 'Support',
+            'k': 'Ochrona(K)',
+            'm': 'Ochrona(M)',
+            'p': 'PEWRO',
+            'y': 'YARD'
+        };
+        const rName = roleNames[letter] || "Inna";
+        return {
+            className: `group-${letter}`,
+            name: rName,
+            code: letter,
+            badgeHtml: `<span class="group-badge group-${letter}"></span>`
+        };
+    }
+    return null;
 }
 
 function createWorkerCard(worker, shiftCode, dayIndex) {
@@ -780,7 +805,10 @@ function createWorkerCard(worker, shiftCode, dayIndex) {
     else badgeClass += " style-shift-other";
 
     // Dynamic Group Badge
-    const groupInfo = getWorkerGroupInfo(worker);
+    let groupInfo = extractGroupFromShiftCode(shiftCode);
+    if (!groupInfo) {
+        groupInfo = getWorkerGroupInfo(worker);
+    }
     const groupBadge = groupInfo.badgeHtml || "";
 
     div.innerHTML = `
@@ -876,9 +904,10 @@ function renderSchedule() {
                 listOther.appendChild(card);
                 cO++;
                 break;
-            case "ABSENT":
-                const groupInfo = getWorkerGroupInfo(worker);
-                const groupBadge = groupInfo.badgeHtml || "";
+            case "ABSENT": {
+                let absentGroupInfo = extractGroupFromShiftCode(shiftCode);
+                if (!absentGroupInfo) absentGroupInfo = getWorkerGroupInfo(worker);
+                const absentGroupBadge = absentGroupInfo.badgeHtml || "";
 
                 const displayCode = displayShiftCode(shiftCode);
                 const emptyClass = !shiftCode ? " badge-empty" : "";
@@ -886,7 +915,7 @@ function renderSchedule() {
                           <div class="flex items-center gap-2">
                             <div class="avatar avatar-wrapper">
                               ${worker.name.charAt(0)}
-                              ${groupBadge ? `<div class="badge-wrapper">${groupBadge}</div>` : ""}
+                              ${absentGroupBadge ? `<div class="badge-wrapper">${absentGroupBadge}</div>` : ""}
                             </div>
                             <span class="worker-name">${worker.name}</span>
                           </div>
@@ -895,12 +924,13 @@ function renderSchedule() {
                           </div>
                         `;
                 card.onclick = () => {
-                    selectWorker(worker.id, worker.name, groupBadge);
+                    selectWorker(worker.id, worker.name, absentGroupBadge);
                     switchView("individual");
                 };
                 listAbsent.appendChild(card);
                 cAbsent++;
                 break;
+            }
         }
     });
 

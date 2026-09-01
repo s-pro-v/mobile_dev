@@ -514,7 +514,7 @@ header::after {
 
 /* Date Controls (Daily View) */
 .date-controls {
-    padding: 0.2rem;
+    padding: 0.125rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -523,9 +523,11 @@ header::after {
     box-shadow: var(--shadow-inset);
     background-color: var(--bg-tertiary);
     border: 0px solid var(--bg-tertiary);
-    outline: 1px solid var(--bg-tertiary);
-    outline-offset: -2px;
-    outline-width: 2px;
+    /* outline: 1px solid var(--bg-tertiary); */
+    /* outline-offset: -2px; */
+    /* outline-width: 2px; */
+    /* position: relative; */
+    /* overflow: hidden; */
 }
 
 .nav-btn {
@@ -1008,7 +1010,9 @@ main {
 }
 
 @keyframes loader-ring-pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 0.6;
         transform: scale(0.95);
     }
@@ -1020,7 +1024,9 @@ main {
 }
 
 @keyframes loader-text-pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 0.85;
     }
 
@@ -1032,7 +1038,7 @@ main {
 /* Shift Sections */
 section {
     position: relative;
-    padding: 0.5rem 0.5rem;
+    padding: 0.125rem;
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-drop);
     background-color: var(--panel-bg);
@@ -1047,7 +1053,7 @@ section {
     margin-bottom: 0.2rem;
     position: sticky;
     top: 0;
-    background-image: var(--metal-gradient);
+    background-color: var(--bg-tertiary);
     padding: 0.2rem 1rem;
     z-index: 10;
     transition: all 0.2s;
@@ -1088,9 +1094,12 @@ section {
 .list-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.2rem;
+    gap: 0.125rem;
     background: var(--gradient-2);
     box-shadow: var(--shadow-inset);
+    position: relative;
+    overflow: hidden;
+    padding: 0.125rem;
 }
 
 /* Individual List - Calendar Mode Modification */
@@ -1233,10 +1242,8 @@ section {
 }
 
 .style-shift-2 .list-grid {
-    background-color: color-mix(in srgb, var(--highlight-color) 20%, transparent);
+    /* background-color: color-mix(in srgb, var(--highlight-color) 20%, transparent); */
     background-image: var(--gradient-2);
-
-
 }
 
 .badge-shift-2 {
@@ -1341,11 +1348,17 @@ section {
 }
 
 .sub-list {
-    padding-left: 0.5rem;
+    /* padding-left: 0.5rem; */
     border-left: 1px solid var(--border-color);
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.4rem;
+    grid-template-columns: 1fr;
+    gap: 0.125rem;
+    box-shadow: var(--shadow-inset);
+    position: relative;
+    overflow: hidden;
+    padding: 0.125rem;
+    width: fit-content;
+    min-width: 13.5rem;
 }
 
 /* Footer */
@@ -1457,6 +1470,11 @@ i {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.2rem;
+    box-shadow: var(--shadow-inset);
+    position: relative;
+    overflow: hidden;
+    padding: 0.125rem;
+    gap: 0.125rem !important;
 }
 
 .absent-card {
@@ -2512,13 +2530,15 @@ i {
         font-size: 0.9rem;
     }
 
-    .view-btn, .view-btn-back {
+    .view-btn,
+    .view-btn-back {
         min-height: 44px;
         padding: 0.5rem 0.75rem;
         font-size: 0.85rem;
     }
 
-    .nav-btn, .theme-btn {
+    .nav-btn,
+    .theme-btn {
         min-width: 44px;
         min-height: 44px;
     }

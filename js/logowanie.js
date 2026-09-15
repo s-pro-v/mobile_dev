@@ -87,16 +87,28 @@ const DOM = {
   spinner: document.getElementById("wait-spinner"),
 };
 
-// Pomocnicze funkcje kodowania
-const toBase64 = (str) => btoa(unescape(encodeURIComponent(str)));
-const fromBase64 = (b64) => decodeURIComponent(escape(atob(b64)));
+// Pomocnicze funkcje kodowania (nowoczesne, zastępujące przestarzałe escape/unescape)
+const toBase64 = (str) => {
+  const bytes = new TextEncoder().encode(str);
+  const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
+  return btoa(binString);
+};
+
+const fromBase64 = (b64) => {
+  const binString = atob(b64);
+  const bytes = new Uint8Array(binString.length);
+  for (let i = 0; i < binString.length; i++) {
+    bytes[i] = binString.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+};
 
 function xorDecode(base64Encoded, key) {
   const binary = atob(base64Encoded);
   let out = "";
   for (let i = 0; i < binary.length; i++) {
     out += String.fromCharCode(
-      binary.charCodeAt(i) ^ key.charCodeAt(i % key.length),
+      binary.charCodeAt(i) ^ key.charCodeAt(i % key.length)
     );
   }
   return out;
@@ -115,9 +127,7 @@ function updateLog(msg, state = "default") {
 
 async function loadPat() {
   try {
-    const pat =
-      typeof localStorage !== "undefined" &&
-      localStorage.getItem(GITHUB_PAT_STORAGE);
+    const pat = typeof localStorage !== "undefined" && localStorage.getItem(GITHUB_PAT_STORAGE);
     if (pat && pat.trim() !== "") {
       GITHUB_PAT = pat.trim();
       return;
@@ -130,23 +140,34 @@ async function loadPat() {
   const item = Array.isArray(data) ? data[0] : data;
   const enc = item && item.sys_pat;
   if (!enc) throw new Error("Brak sys_pat w auth.json");
+  
   GITHUB_PAT = xorDecode(enc, XOR_KEY);
+  
   try {
     localStorage.setItem(GITHUB_PAT_STORAGE, GITHUB_PAT);
   } catch (e) {}
 }
 
+// Funkcja pomocnicza do obsługi błędów 401
+function handleAuthError(status) {
+  if (status === 401) {
+    localStorage.removeItem(GITHUB_PAT_STORAGE);
+    console.warn("Wykryto nieważny token (401). Usunięto go z pamięci podręcznej.");
+  }
+}
+
 async function githubGetFileSafe(path) {
   if (!GITHUB_PAT) throw new Error("Brak aktywnego klucza API");
 
-  // Parametr ?t= chroni przed pamięcią podręczną bez wyzwalania błędów CORS
   const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?t=${Date.now()}`;
   const res = await fetch(url, {
     headers: {
-      Authorization: `token ${GITHUB_PAT}`,
+      Authorization: `Bearer ${GITHUB_PAT}`,
       Accept: "application/vnd.github.v3+json",
     },
   });
+
+  if (res.status === 401) handleAuthError(res.status);
 
   if (res.status === 404) {
     return {
@@ -187,7 +208,6 @@ async function githubGetFileSafe(path) {
 async function githubPutFileSafe(path, updateFn, commitMsg, retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      // Pobierz aktualne SHA tuż przed zapisem
       const { sha, data } = await githubGetFileSafe(path);
       const updatedData = updateFn(data);
 
@@ -201,15 +221,16 @@ async function githubPutFileSafe(path, updateFn, commitMsg, retries = 3) {
       const res = await fetch(url, {
         method: "PUT",
         headers: {
-          Authorization: `token ${GITHUB_PAT}`,
+          Authorization: `Bearer ${GITHUB_PAT}`,
           Accept: "application/vnd.github.v3+json",
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
       });
 
+      if (res.status === 401) handleAuthError(res.status);
+
       if (res.status === 409 && attempt < retries) {
-        // Konflikt SHA – ponów próbę z opóźnieniem
         await new Promise((r) => setTimeout(r, 500 * attempt));
         continue;
       }
@@ -255,7 +276,7 @@ async function initCredentials() {
       if (Object.keys(IDENTITY_MATRIX).length) {
         updateLog(
           "[SYSTEM] Matryca wczytana. Gotowy do autoryzacji.",
-          "success",
+          "success"
         );
         DOM.loginBtn.disabled = false;
         DOM.loginBtn.innerHTML =
@@ -299,12 +320,12 @@ async function handleLogin() {
             last_active: Date.now(),
           };
           data.audit_log.unshift(
-            `[${new Date().toLocaleString("pl-PL")}] AUTH_SUCCESS: Direct -> ${node.name}`,
+            `[${new Date().toLocaleString("pl-PL")}] AUTH_SUCCESS: Direct -> ${node.name}`
           );
           if (data.audit_log.length > 100) data.audit_log.pop();
           return data;
         },
-        `[SYS.AUTH] Direct login: ${node.name}`,
+        `[SYS.AUTH] Direct login: ${node.name}`
       );
 
       localStorage.setItem("sys_auth_2fa_mobile", node.name);
@@ -331,7 +352,7 @@ async function handleLogin() {
         };
         return data;
       },
-      `[SYS.AUTH] Żądanie PUSH: ${node.name}`,
+      `[SYS.AUTH] Żądanie PUSH: ${node.name}`
     );
 
     ACTIVE_USER = node;
@@ -340,7 +361,7 @@ async function handleLogin() {
     DOM.userDisp.textContent = node.name;
     updateLog(
       "[SYSTEM] Oczekiwanie na akceptację PUSH przez administratora...",
-      "warning",
+      "warning"
     );
     startPolling();
   } catch (e) {
@@ -363,7 +384,7 @@ function startPolling() {
         clearInterval(POLLING_INTERVAL);
         updateLog(
           "[SYSTEM] Zezwolenie uzyskane. Generowanie kryptogramu...",
-          "success",
+          "success"
         );
         DOM.spinner.style.display = "none";
         await autoTypeToken(ACTIVE_USER.token);
@@ -406,12 +427,12 @@ async function finalizeSession() {
           last_active: Date.now(),
         };
         data.audit_log.unshift(
-          `[${new Date().toLocaleString("pl-PL")}] AUTH_SUCCESS: PUSH -> ${ACTIVE_USER.name}`,
+          `[${new Date().toLocaleString("pl-PL")}] AUTH_SUCCESS: PUSH -> ${ACTIVE_USER.name}`
         );
         if (data.audit_log.length > 100) data.audit_log.pop();
         return data;
       },
-      `[SYS.AUTH] Finalizacja sesji: ${ACTIVE_USER.name}`,
+      `[SYS.AUTH] Finalizacja sesji: ${ACTIVE_USER.name}`
     );
 
     localStorage.setItem("sys_auth_2fa_mobile", ACTIVE_USER.name);
@@ -447,11 +468,11 @@ async function handleCancel(e) {
           delete data.access_permissions[userKey];
         if (data.active_sessions[userKey]) delete data.active_sessions[userKey];
         data.audit_log.unshift(
-          `[${new Date().toLocaleString("pl-PL")}] USER_LOGOUT: ${ACTIVE_USER.name}`,
+          `[${new Date().toLocaleString("pl-PL")}] USER_LOGOUT: ${ACTIVE_USER.name}`
         );
         return data;
       },
-      `[SYS.AUTH] Anulowanie/Wylogowanie: ${ACTIVE_USER.name}`,
+      `[SYS.AUTH] Anulowanie/Wylogowanie: ${ACTIVE_USER.name}`
     );
   } catch (err) {
     console.error(err);
@@ -467,6 +488,7 @@ if (DOM.resetCacheBtn) {
   DOM.resetCacheBtn.addEventListener("click", () => {
     localStorage.removeItem("sys_auth_2fa_mobile");
     localStorage.removeItem("sys_auth_login_time");
+    localStorage.removeItem(GITHUB_PAT_STORAGE); // DODANO: usuwa również klucz API
     updateLog("[SYSTEM] Pamięć sesji podręcznej wyczyszczona.", "success");
     setTimeout(() => location.reload(), 400);
   });
@@ -488,25 +510,13 @@ if (DOM.userInput) {
   });
 }
 
-// Inicjalizacja uruchomieniowa
-loadPat()
-  .then(() => {
-    initCredentials();
-  })
-  .catch((e) => updateLog("[BŁĄD INICJALIZACJI] " + e.message, "error"));
-
 // --- Obsługa zmiany motywu: #theme-btn ---
-// Funkcja do ustawiania motywu oraz przechowująca wybór w localStorage
 const THEME_KEY = "sys_auth_theme";
 function applyTheme(theme) {
-  // Ustaw atrybut theme na elemencie <html>
   document.documentElement.setAttribute("theme", theme);
-  // Zachowaj wybór w localStorage
   localStorage.setItem(THEME_KEY, theme);
-  // (Opcjonalnie: możesz tu dodać przełączanie klas motywu jeśli korzystasz z nich w CSS)
 }
 
-// Funkcja do aktualizacji ikony przycisku motywu
 function updateThemeBtnIcon() {
   if (!DOM.themeBtn) return;
   DOM.themeBtn.innerHTML =
@@ -515,7 +525,6 @@ function updateThemeBtnIcon() {
       : '<i class="fas fa-sun"></i>';
 }
 
-// Przycisk zmiany motywu (#theme-btn)
 if (DOM.themeBtn) {
   DOM.themeBtn.addEventListener("click", function () {
     const isDark = document.documentElement.getAttribute("theme") === "dark";
@@ -524,7 +533,6 @@ if (DOM.themeBtn) {
   });
 }
 
-// Ustaw motyw na podstawie localStorage lub domyślnie oraz uaktualnij ikonę
 (function initTheme() {
   try {
     const saved = localStorage.getItem(THEME_KEY);
@@ -539,14 +547,13 @@ if (DOM.themeBtn) {
   updateThemeBtnIcon();
 })();
 
-// Autostart: załaduj klucz API (auth.json XOR lub localStorage), potem credentials i lista wylogowań z GitHub
+// Inicjalizacja uruchomieniowa (tylko jedna pętla z obsługą błędów)
 loadPat()
   .then(() => {
     initCredentials();
-    refreshLogoutInfo();
   })
   .catch((e) => {
-    updateLog("[BŁĄD] " + (e.message || e), "error");
+    updateLog("[BŁĄD INICJALIZACJI] " + (e.message || e), "error");
   });
 
 // Zablokuj możliwość cofania (przycisk Wstecz)
